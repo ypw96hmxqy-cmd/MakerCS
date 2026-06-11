@@ -16,10 +16,6 @@ local flySpeed = 50
 local cons = {}
 local esps = {}
 
--- For mobile movement
-local moveDirection = Vector3.new()
-local originalMovementMode = nil
-
 local gui = Instance.new("ScreenGui")
 gui.Name = "MakerCS"
 gui.ResetOnSpawn = false
@@ -178,41 +174,38 @@ local function toggleFly()
         bv.MaxForce = Vector3.new(9e9,9e9,9e9)
         bg.MaxTorque = Vector3.new(9e9,9e9,9e9)
         
-        -- Enable mobile joystick if on touch device
-        if UserInputService.TouchEnabled then
-            originalMovementMode = hum.MovementMode
-            hum.MovementMode = Enum.MovementMode.Thirteen
-            notify("Mobile joystick enabled! Use the default Roblox joystick to fly.")
-        end
-        
         table.insert(cons, RS.RenderStepped:Connect(function()
             if not flying then return end
             local cam = workspace.CurrentCamera
+            
+            -- Get movement direction from joystick (MoveDirection) or keyboard
+            local moveVector = hum.MoveDirection
             local dir = Vector3.new()
             
-            -- On mobile, use the humanoid's MoveDirection from the default joystick
-            if UserInputService.TouchEnabled then
-                local moveVec = hum.MoveDirection
-                if moveVec.Magnitude > 0 then
-                    -- Use camera-relative movement
-                    dir = (cam.CFrame.RightVector * moveVec.X + cam.CFrame.LookVector * -moveVec.Z)
-                    -- Add vertical movement using jump button (Space on mobile)
-                    if UIS:IsKeyDown(Enum.KeyCode.Space) or UIS:IsKeyDown(Enum.KeyCode.ButtonA) then
-                        dir = dir + Vector3.new(0, 1, 0)
-                    end
-                    -- Descend using crouch (Shift on mobile)
-                    if UIS:IsKeyDown(Enum.KeyCode.LeftShift) or UIS:IsKeyDown(Enum.KeyCode.ButtonR2) then
-                        dir = dir + Vector3.new(0, -1, 0)
-                    end
-                end
+            if moveVector.Magnitude > 0 then
+                -- Convert joystick direction to camera-relative movement
+                -- X is strafe (right/left), Z is forward/back
+                local forwardMovement = -moveVector.Z
+                local rightMovement = moveVector.X
+                
+                -- Calculate direction relative to camera
+                dir = (cam.CFrame.RightVector * rightMovement) + (cam.CFrame.LookVector * forwardMovement)
+                dir = dir.Unit
             else
-                -- PC controls
+                -- PC keyboard controls fallback
                 if UIS:IsKeyDown(Enum.KeyCode.W) then dir += cam.CFrame.LookVector end
                 if UIS:IsKeyDown(Enum.KeyCode.S) then dir -= cam.CFrame.LookVector end
                 if UIS:IsKeyDown(Enum.KeyCode.A) then dir -= cam.CFrame.RightVector end
                 if UIS:IsKeyDown(Enum.KeyCode.D) then dir += cam.CFrame.RightVector end
-                if UIS:IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.new(0, 1, 0) end
-                if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then dir -= Vector3.new(0, 1, 0) end
+                if dir.Magnitude > 0 then dir = dir.Unit end
+            end
+            
+            -- Vertical movement (same for both mobile and PC)
+            if UIS:IsKeyDown(Enum.KeyCode.Space) then
+                dir = dir + Vector3.new(0, 1, 0)
+            end
+            if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
+                dir = dir + Vector3.new(0, -1, 0)
             end
             
             if dir.Magnitude > 0 then
@@ -223,14 +216,14 @@ local function toggleFly()
             bg.CFrame = cam.CFrame
         end))
         
-        notify("Fly Enabled" .. (UserInputService.TouchEnabled and " - Use default joystick to move! Jump = Up, Crouch = Down" or ""))
+        if UserInputService.TouchEnabled then
+            notify("Fly Enabled - Move joystick to fly in that direction! Space/Crouch = Up/Down")
+        else
+            notify("Fly Enabled - Use WASD to move, Space/Ctrl for up/down")
+        end
     else
         for _,v in root:GetChildren() do
             if v:IsA("BodyVelocity") or v:IsA("BodyGyro") then v:Destroy() end
-        end
-        -- Restore original movement mode
-        if UserInputService.TouchEnabled and originalMovementMode then
-            hum.MovementMode = originalMovementMode
         end
         notify("Fly Disabled")
     end
@@ -329,8 +322,3 @@ end)
 local gameName = game.Name or "Unknown Game"
 local deviceType = UserInputService.TouchEnabled and "Mobile (iOS/Android)" or "PC"
 notify("MakerAdminCS Loaded!\nGame: " .. gameName .. "\nDevice: " .. deviceType .. "\nAll scripts are in the Scripts tab!")
-
--- Mobile fly instructions
-if UserInputService.TouchEnabled then
-    task.wait(2)
-    notify("Mobile Tip: Enable Fly, then use default joystick to move! Jump button flies up, Crouch button flies down.")
