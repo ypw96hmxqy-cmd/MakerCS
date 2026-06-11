@@ -1,4 +1,8 @@
--- // MakerAdminCS - Mobile Friendly Admin Script
+-- =============================================
+-- MakerAdminCS - Mobile Friendly Roblox Admin Script
+-- GitHub: https://github.com/ypw96hmxqy-cmd/MakerCS
+-- =============================================
+
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -36,9 +40,7 @@ mainFrame.Active = true
 mainFrame.Draggable = true
 mainFrame.Parent = screenGui
 
-local uiCorner = Instance.new("UICorner")
-uiCorner.CornerRadius = UDim.new(0, 12)
-uiCorner.Parent = mainFrame
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
 
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 60)
@@ -48,10 +50,7 @@ title.TextColor3 = Color3.new(1,1,1)
 title.TextScaled = true
 title.Font = Enum.Font.GothamBold
 title.Parent = mainFrame
-
-local titleCorner = Instance.new("UICorner")
-titleCorner.CornerRadius = UDim.new(0, 12)
-titleCorner.Parent = title
+Instance.new("UICorner", title).CornerRadius = UDim.new(0, 12)
 
 -- X Button
 local minimizeBtn = Instance.new("TextButton")
@@ -65,7 +64,7 @@ minimizeBtn.Font = Enum.Font.GothamBold
 minimizeBtn.Parent = mainFrame
 Instance.new("UICorner", minimizeBtn)
 
--- Icon
+-- Icon Button
 local iconBtn = Instance.new("TextButton")
 iconBtn.Size = UDim2.new(0, 80, 0, 80)
 iconBtn.Position = UDim2.new(0.5, -40, 0.1, 0)
@@ -106,22 +105,90 @@ local function notify(title, text)
     StarterGui:SetCore("SendNotification", {Title = title, Text = text, Duration = 4})
 end
 
--- Toggle Functions (ESP, Fly, Noclip, WalkFling, Disco) ...
--- (The rest of the script is the same as the previous working version)
+-- Toggle ESP
+local function toggleESP()
+    espEnabled = not espEnabled
+    if espEnabled then
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= player and plr.Character and plr.Character:FindFirstChild("Head") then
+                local bb = Instance.new("BillboardGui")
+                bb.Adornee = plr.Character.Head
+                bb.Size = UDim2.new(5, 0, 2, 0)
+                bb.StudsOffset = Vector3.new(0, 4, 0)
+                bb.AlwaysOnTop = true
+                local txt = Instance.new("TextLabel", bb)
+                txt.Size = UDim2.new(1,0,1,0)
+                txt.BackgroundTransparency = 1
+                txt.Text = plr.Name
+                txt.TextColor3 = Color3.fromRGB(255, 85, 85)
+                txt.TextStrokeTransparency = 0
+                txt.Font = Enum.Font.GothamBold
+                txt.TextScaled = true
+                bb.Parent = player.PlayerGui
+                table.insert(espBillboards, bb)
+            end
+        end
+        notify("ESP", "Enabled")
+    else
+        for _, bb in ipairs(espBillboards) do bb:Destroy() end
+        espBillboards = {}
+        notify("ESP", "Disabled")
+    end
+end
 
--- [Full script continues here with all functions: toggleESP, toggleFly, toggleNoclip, toggleWalkFling, toggleDisco, etc.]
+-- Toggle Fly
+local function toggleFly()
+    flying = not flying
+    if flying then
+        local bv = Instance.new("BodyVelocity")
+        local bg = Instance.new("BodyGyro")
+        bv.MaxForce = Vector3.new(1e5,1e5,1e5)
+        bg.MaxTorque = Vector3.new(1e5,1e5,1e5)
+        bv.Parent = root
+        bg.Parent = root
+        table.insert(connections, RunService.Heartbeat:Connect(function()
+            if not flying then return end
+            local cam = workspace.CurrentCamera
+            local dir = Vector3.new()
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += cam.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= cam.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= cam.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += cam.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.new(0,1,0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir -= Vector3.new(0,1,0) end
+            local finalDir = dir.Magnitude > 0 and dir.Unit or Vector3.new()
+            bv.Velocity = finalDir * flySpeed
+            bg.CFrame = cam.CFrame
+        end))
+        notify("Fly", "Enabled")
+    else
+        for _, c in ipairs(connections) do if c then c:Disconnect() end end
+        connections = {}
+        if root:FindFirstChild("BodyVelocity") then root.BodyVelocity:Destroy() end
+        if root:FindFirstChild("BodyGyro") then root.BodyGyro:Destroy() end
+        notify("Fly", "Disabled")
+    end
+end
 
--- For brevity in this message, copy the full working version from my previous response and combine it here.
--- If you want me to send the **complete single-file version** right now, just say "send full file".
+-- Toggle Noclip
+local function toggleNoclip()
+    noclipping = not noclipping
+    notify("Noclip", noclipping and "Enabled" or "Disabled")
+end
 
-minimizeBtn.MouseButton1Click:Connect(function()
-    mainFrame.Visible = false
-    iconBtn.Visible = true
-end)
+table.insert(connections, RunService.Stepped:Connect(function()
+    if noclipping and character then
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+end))
 
-iconBtn.MouseButton1Click:Connect(function()
-    mainFrame.Visible = true
-    iconBtn.Visible = false
-end)
-
-notify("MakerAdminCS", "Loaded successfully!", 5)
+-- Toggle WalkFling
+local function toggleWalkFling()
+    walkflingEnabled = not walkflingEnabled
+    if walkflingEnabled then
+        humanoid.WalkSpeed = 100
+        humanoid.JumpPower =
