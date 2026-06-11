@@ -5,7 +5,6 @@ local RS = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local SG = game:GetService("StarterGui")
 local UserInputService = game:GetService("UserInputService")
-local HttpService = game:GetService("HttpService")
 
 local plr = Players.LocalPlayer
 local char = plr.Character or plr.CharacterAdded:Wait()
@@ -17,12 +16,9 @@ local flySpeed = 50
 local cons = {}
 local esps = {}
 
--- Mobile joystick variables
+-- For mobile movement
 local moveDirection = Vector3.new()
-local joystickActive = false
-local joystickCenter = nil
-local joystickThumb = nil
-local joystickFrame = nil
+local originalMovementMode = nil
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "MakerCS"
@@ -103,123 +99,6 @@ icon.Draggable = true
 icon.Parent = gui
 Instance.new("UICorner", icon).CornerRadius = UDim.new(0, 20)
 
--- Function to get current game info
-local function getCurrentGameInfo()
-    local gameInfo = {
-        name = "Unknown Game",
-        placeId = game.PlaceId,
-        jobId = game.JobId,
-        creator = "Unknown"
-    }
-    
-    -- Get game name from different sources
-    local success, result = pcall(function()
-        -- Try to get from marketplace
-        if game.PlaceId then
-            gameInfo.name = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
-        end
-    end)
-    
-    if not success then
-        -- Fallback: use game name from the game's title
-        gameInfo.name = game.Name or "Unknown Game"
-    end
-    
-    -- Try to get creator/group info
-    local success2, creator = pcall(function()
-        local marketplace = game:GetService("MarketplaceService")
-        local info = marketplace:GetProductInfo(game.PlaceId)
-        if info.Creator then
-            return info.Creator.Name
-        end
-    end)
-    
-    if success2 and creator then
-        gameInfo.creator = creator
-    end
-    
-    return gameInfo
-end
-
--- Create Mobile Joystick for Flying
-local function createJoystick()
-    joystickFrame = Instance.new("Frame")
-    joystickFrame.Size = UDim2.new(0, 140, 0, 140)
-    joystickFrame.Position = UDim2.new(0, 20, 1, -160)
-    joystickFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
-    joystickFrame.BackgroundTransparency = 0.6
-    joystickFrame.Visible = false
-    joystickFrame.Parent = gui
-    Instance.new("UICorner", joystickFrame).CornerRadius = UDim.new(1, 70)
-    
-    local innerCircle = Instance.new("Frame")
-    innerCircle.Size = UDim2.new(0, 60, 0, 60)
-    innerCircle.Position = UDim2.new(0.5, -30, 0.5, -30)
-    innerCircle.BackgroundColor3 = Color3.fromRGB(100,100,200)
-    innerCircle.BackgroundTransparency = 0.3
-    innerCircle.Parent = joystickFrame
-    Instance.new("UICorner", innerCircle).CornerRadius = UDim.new(1, 30)
-    
-    joystickThumb = Instance.new("Frame")
-    joystickThumb.Size = UDim2.new(0, 50, 0, 50)
-    joystickThumb.Position = UDim2.new(0.5, -25, 0.5, -25)
-    joystickThumb.BackgroundColor3 = Color3.fromRGB(150,150,255)
-    joystickThumb.BackgroundTransparency = 0.2
-    joystickThumb.Parent = joystickFrame
-    Instance.new("UICorner", joystickThumb).CornerRadius = UDim.new(1, 25)
-    
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1,0,0,20)
-    label.Position = UDim2.new(0,0,1,5)
-    label.BackgroundTransparency = 1
-    label.Text = "Fly Joystick"
-    label.TextColor3 = Color3.new(1,1,1)
-    label.TextScaled = true
-    label.Font = Enum.Font.GothamBold
-    label.Parent = joystickFrame
-    
-    local touchStart = nil
-    local thumbStartPos = nil
-    
-    joystickFrame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            touchStart = input.Position
-            thumbStartPos = joystickThumb.Position
-            joystickActive = true
-            joystickCenter = joystickFrame.AbsolutePosition + Vector2.new(70, 70)
-        end
-    end)
-    
-    UserInputService.TouchMoved:Connect(function(input)
-        if joystickActive and input.UserInputType == Enum.UserInputType.Touch then
-            local delta = input.Position - joystickCenter
-            local distance = math.min(delta.Magnitude, 50)
-            local direction = delta.Unit
-            local newPos = Vector2.new(direction.X * distance, direction.Y * distance)
-            
-            joystickThumb.Position = UDim2.new(0.5, newPos.X - 25, 0.5, newPos.Y - 25)
-            
-            -- Calculate movement direction for flying
-            local cam = workspace.CurrentCamera
-            local moveVec = Vector3.new(direction.X, 0, -direction.Y)
-            moveDirection = (cam.CFrame.RightVector * moveVec.X + cam.CFrame.LookVector * moveVec.Z).Unit
-        end
-    end)
-    
-    UserInputService.TouchEnded:Connect(function(input)
-        if joystickActive then
-            joystickActive = false
-            joystickThumb.Position = UDim2.new(0.5, -25, 0.5, -25)
-            moveDirection = Vector3.new()
-        end
-    end)
-end
-
--- Create joystick only on mobile
-if UserInputService.TouchEnabled then
-    createJoystick()
-end
-
 -- Content Frames
 local mainContent = Instance.new("Frame")
 mainContent.Size = UDim2.new(1,0,1,-130)
@@ -242,7 +121,7 @@ scriptsList.Padding = UDim.new(0, 10)
 scriptsList.SortOrder = Enum.SortOrder.LayoutOrder
 
 local function notify(txt)
-    SG:SetCore("SendNotification", {Title="MakerCS", Text=txt, Duration=5})
+    SG:SetCore("SendNotification", {Title="MakerCS", Text=txt, Duration=3})
 end
 
 local function makeButton(parent, text, posY, toggleFunc, state)
@@ -299,9 +178,11 @@ local function toggleFly()
         bv.MaxForce = Vector3.new(9e9,9e9,9e9)
         bg.MaxTorque = Vector3.new(9e9,9e9,9e9)
         
-        -- Show joystick on mobile when flying
-        if joystickFrame then
-            joystickFrame.Visible = true
+        -- Enable mobile joystick if on touch device
+        if UserInputService.TouchEnabled then
+            originalMovementMode = hum.MovementMode
+            hum.MovementMode = Enum.MovementMode.Thirteen
+            notify("Mobile joystick enabled! Use the default Roblox joystick to fly.")
         end
         
         table.insert(cons, RS.RenderStepped:Connect(function()
@@ -309,12 +190,20 @@ local function toggleFly()
             local cam = workspace.CurrentCamera
             local dir = Vector3.new()
             
-            -- Check if on mobile with active joystick
-            if UserInputService.TouchEnabled and joystickActive and moveDirection.Magnitude > 0 then
-                dir = moveDirection
-                -- Add vertical controls (up/down buttons can be added or use two-finger)
-                if UserInputService:IsKeyDown(Enum.KeyCode.Thumbstick2) then
-                    dir = dir + Vector3.new(0, 1, 0)
+            -- On mobile, use the humanoid's MoveDirection from the default joystick
+            if UserInputService.TouchEnabled then
+                local moveVec = hum.MoveDirection
+                if moveVec.Magnitude > 0 then
+                    -- Use camera-relative movement
+                    dir = (cam.CFrame.RightVector * moveVec.X + cam.CFrame.LookVector * -moveVec.Z)
+                    -- Add vertical movement using jump button (Space on mobile)
+                    if UIS:IsKeyDown(Enum.KeyCode.Space) or UIS:IsKeyDown(Enum.KeyCode.ButtonA) then
+                        dir = dir + Vector3.new(0, 1, 0)
+                    end
+                    -- Descend using crouch (Shift on mobile)
+                    if UIS:IsKeyDown(Enum.KeyCode.LeftShift) or UIS:IsKeyDown(Enum.KeyCode.ButtonR2) then
+                        dir = dir + Vector3.new(0, -1, 0)
+                    end
                 end
             else
                 -- PC controls
@@ -334,16 +223,15 @@ local function toggleFly()
             bg.CFrame = cam.CFrame
         end))
         
-        notify("Fly Enabled - Use joystick to move!")
+        notify("Fly Enabled" .. (UserInputService.TouchEnabled and " - Use default joystick to move! Jump = Up, Crouch = Down" or ""))
     else
         for _,v in root:GetChildren() do
             if v:IsA("BodyVelocity") or v:IsA("BodyGyro") then v:Destroy() end
         end
-        if joystickFrame then
-            joystickFrame.Visible = false
+        -- Restore original movement mode
+        if UserInputService.TouchEnabled and originalMovementMode then
+            hum.MovementMode = originalMovementMode
         end
-        joystickActive = false
-        moveDirection = Vector3.new()
         notify("Fly Disabled")
     end
 end
@@ -438,6 +326,11 @@ icon.MouseButton1Click:Connect(function()
 end)
 
 -- Get game info and show welcome notification
-local gameInfo = getCurrentGameInfo()
+local gameName = game.Name or "Unknown Game"
 local deviceType = UserInputService.TouchEnabled and "Mobile (iOS/Android)" or "PC"
-notify("Loaded! You are playing: " .. gameInfo.name .. "\nPlace ID: " .. gameInfo.placeId .. "\nDevice: " .. deviceType .. "\nAll scripts are in the Scripts tab!")
+notify("MakerAdminCS Loaded!\nGame: " .. gameName .. "\nDevice: " .. deviceType .. "\nAll scripts are in the Scripts tab!")
+
+-- Mobile fly instructions
+if UserInputService.TouchEnabled then
+    task.wait(2)
+    notify("Mobile Tip: Enable Fly, then use default joystick to move! Jump button flies up, Crouch button flies down.")
