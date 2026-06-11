@@ -1,4 +1,4 @@
--- MakerAdminCS - Delta iOS (Vertex MM2 Focused)
+-- MakerAdminCS - Delta iOS with All Scripts (IY + Tiger X + Vertex MM2)
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RS = game:GetService("RunService")
@@ -22,8 +22,8 @@ gui.Parent = plr:WaitForChild("PlayerGui")
 
 -- Main Frame
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 300, 0, 480)
-mainFrame.Position = UDim2.new(0.5, -150, 0.5, -240)
+mainFrame.Size = UDim2.new(0, 300, 0, 520)
+mainFrame.Position = UDim2.new(0.5, -150, 0.5, -260)
 mainFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 mainFrame.Active = true
 mainFrame.Draggable = true
@@ -96,13 +96,13 @@ Instance.new("UICorner", icon).CornerRadius = UDim.new(0, 20)
 
 -- Content Frames
 local mainContent = Instance.new("Frame")
-mainContent.Size = UDim2.new(1,0,1,-120)
+mainContent.Size = UDim2.new(1,0,1,-130)
 mainContent.Position = UDim2.new(0,0,0,100)
 mainContent.BackgroundTransparency = 1
 mainContent.Parent = mainFrame
 
 local scriptsContent = Instance.new("Frame")
-scriptsContent.Size = UDim2.new(1,0,1,-120)
+scriptsContent.Size = UDim2.new(1,0,1,-130)
 scriptsContent.Position = UDim2.new(0,0,0,100)
 scriptsContent.BackgroundTransparency = 1
 scriptsContent.Visible = false
@@ -219,12 +219,28 @@ makeButton(mainContent, "Toggle Noclip", 70, toggleNoclip, {noclipping})
 makeButton(mainContent, "Toggle ESP", 130, toggleESP, {espOn})
 makeButton(mainContent, "Toggle Disco", 190, toggleDisco, {discoOn})
 
--- === SCRIPTS TAB (Vertex MM2 Only) ===
-makeButton(scriptsContent, "Load Vertex MM2", 20, function()
+-- === SCRIPTS TAB - All Scripts ===
+makeButton(scriptsContent, "Load Infinite Yield", 10, function()
+    notify("Loading Infinite Yield...")
+    pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+        notify("Infinite Yield Loaded!")
+    end)
+end, nil)
+
+makeButton(scriptsContent, "Load Tiger X (Brookhaven)", 70, function()
+    notify("Loading Tiger X...")
+    pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/BalintTheDevXBack/Games/refs/heads/main/TIGER_X_Brookhaven"))()
+        notify("Tiger X Loaded!")
+    end)
+end, nil)
+
+makeButton(scriptsContent, "Load Vertex MM2", 130, function()
     notify("Loading Vertex MM2...")
     pcall(function()
         loadstring(game:HttpGet('https://raw.smokingscripts.org/vertex.lua'))()
-        notify("Vertex MM2 Loaded! (Play in MM2)")
+        notify("Vertex MM2 Loaded! (Best in MM2)")
     end)
 end, nil)
 
@@ -254,4 +270,4 @@ icon.MouseButton1Click:Connect(function()
     icon.Visible = false
 end)
 
-notify("MakerAdminCS Loaded! Use Scripts tab for Vertex MM2.")
+notify("MakerAdminCS Loaded! All scripts are in the Scripts tab.")
