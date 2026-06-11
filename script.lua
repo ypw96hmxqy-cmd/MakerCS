@@ -4,6 +4,7 @@ local UIS = game:GetService("UserInputService")
 local RS = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local SG = game:GetService("StarterGui")
+local Context = game:GetService("ContextActionService")
 
 local plr = Players.LocalPlayer
 local char = plr.Character or plr.CharacterAdded:Wait()
@@ -135,28 +136,60 @@ local function makeButton(parent, text, posY, toggleFunc, state)
     return btn
 end
 
--- === MAIN TAB FEATURES ===
+-- === FIXED FLY (R6 & R15 with Joystick Support) ===
 local function toggleFly()
     flying = not flying
     if flying then
-        local bv = Instance.new("BodyVelocity", root)
-        local bg = Instance.new("BodyGyro", root)
+        local torso = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") or root
+        
+        local bv = Instance.new("BodyVelocity")
         bv.MaxForce = Vector3.new(9e9,9e9,9e9)
+        bv.Parent = torso
+        
+        local bg = Instance.new("BodyGyro")
         bg.MaxTorque = Vector3.new(9e9,9e9,9e9)
-        table.insert(cons, RS.RenderStepped:Connect(function()
-            if not flying then return end
+        bg.P = 1000
+        bg.D = 100
+        bg.Parent = torso
+        
+        local flyCon = RS.RenderStepped:Connect(function()
+            if not flying or not torso then return end
             local cam = workspace.CurrentCamera
             local dir = Vector3.new()
+            
+            -- Keyboard
             if UIS:IsKeyDown(Enum.KeyCode.W) then dir += cam.CFrame.LookVector end
             if UIS:IsKeyDown(Enum.KeyCode.S) then dir -= cam.CFrame.LookVector end
             if UIS:IsKeyDown(Enum.KeyCode.A) then dir -= cam.CFrame.RightVector end
             if UIS:IsKeyDown(Enum.KeyCode.D) then dir += cam.CFrame.RightVector end
-            bv.Velocity = dir.Unit * flySpeed
+            if UIS:IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.new(0,1,0) end
+            if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then dir -= Vector3.new(0,1,0) end
+            
+            -- Gamepad (Joystick)
+            local thumbstick = UIS:GetGamepadState(Enum.UserInputType.Gamepad1)
+            if thumbstick then
+                local leftX = thumbstick.LeftThumbstickX or 0
+                local leftY = thumbstick.LeftThumbstickY or 0
+                local rightX = thumbstick.RightThumbstickX or 0
+                local rightY = thumbstick.RightThumbstickY or 0
+                
+                dir += cam.CFrame.RightVector * leftX
+                dir += cam.CFrame.LookVector * -leftY
+                dir += Vector3.new(0,1,0) * rightY
+            end
+            
+            if dir.Magnitude > 0 then
+                bv.Velocity = dir.Unit * flySpeed
+            else
+                bv.Velocity = Vector3.new()
+            end
             bg.CFrame = cam.CFrame
-        end))
+        end)
+        table.insert(cons, flyCon)
         notify("Fly Enabled")
     else
-        for _,v in root:GetChildren() do
+        local torso = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") or root
+        for _,v in torso:GetChildren() do
             if v:IsA("BodyVelocity") or v:IsA("BodyGyro") then v:Destroy() end
         end
         notify("Fly Disabled")
