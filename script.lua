@@ -1,4 +1,4 @@
--- MakerAdminCS - Delta iOS with All Scripts (IY + Tiger X + Vertex MM2 + Pastefy + Emotes)
+-- MakerCS - Delta iOS with All Scripts (IY + Tiger X + Vertex MM2 + Pastefy + Emotes)
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RS = game:GetService("RunService")
@@ -15,6 +15,108 @@ local flying, noclipping, espOn, discoOn = false, false, false, false
 local flySpeed = 50
 local cons = {}
 local esps = {}
+
+-- Store camera for reference
+local camera = workspace.CurrentCamera
+
+-- Function to detect executor
+local function detectExecutor()
+    -- Check for Roblox Studio
+    if game:GetService("RunService"):IsStudio() then
+        return "Roblox Studio"
+    end
+    
+    -- Common executor identifiers
+    local executorNames = {
+        ["Synapse X"] = syn and true or false,
+        ["Krnl"] = krnl and true or false,
+        ["ScriptWare"] = scriptware and true or false,
+        ["Hydrogen"] = hydrogen and true or false,
+        ["Fluxus"] = fluxus and true or false,
+        ["Electron"] = electron and true or false,
+        ["Delta"] = delta and true or false,
+        ["Arceus X"] = arceus and true or false,
+        ["CodeX"] = codex and true or false,
+        ["Evon"] = evon and true or false,
+        ["Vega X"] = vega and true or false,
+        ["Valyse"] = valyse and true or false,
+        ["Oxygen U"] = oxygen and true or false,
+        ["Kiwi X"] = kiwi and true or false,
+        ["Calamity"] = calamity and true or false,
+        ["Comet"] = comet and true or false,
+        ["Swift"] = swift and true or false,
+        ["Nihon"] = nihon and true or false,
+        ["Athena"] = athena and true or false,
+        ["Solara"] = solara and true or false,
+        ["Celestial"] = celestial and true or false,
+        ["Ronix"] = ronix and true or false,
+        ["Wave"] = wave and true or false,
+        ["Aether"] = aether and true or false,
+        ["Elysian"] = elysian and true or false,
+        ["Novaline"] = novaline and true or false,
+        ["Titan"] = titan and true or false,
+    }
+    
+    -- Check for common global executor variables
+    for name, exists in pairs(executorNames) do
+        if exists then
+            return name
+        end
+    end
+    
+    -- Check for identifyexecutor function (common in many executors)
+    local success, result = pcall(function()
+        if identifyexecutor then
+            return identifyexecutor()
+        end
+    end)
+    if success and result and result ~= "" then
+        return result
+    end
+    
+    -- Check game environment for executor indicators
+    local env = getfenv and getfenv() or getrenv and getrenv() or _G
+    local executorIndicators = {
+        "Synapse", "Krnl", "ScriptWare", "Hydrogen", "Fluxus", 
+        "Electron", "Delta", "Arceus", "CodeX", "Evon", "Vega"
+    }
+    
+    for _, indicator in pairs(executorIndicators) do
+        if env[indicator] or rawget(env, indicator) then
+            return indicator
+        end
+    end
+    
+    -- Check for Delta iOS specific (since you mentioned Delta iOS)
+    if game:GetService("UserInputService").TouchEnabled and not game:GetService("RunService"):IsStudio() then
+        -- Could be Delta or another mobile executor
+        local success, deltaCheck = pcall(function()
+            return getexecutorname and getexecutorname()
+        end)
+        if success and deltaCheck then
+            return deltaCheck
+        end
+    end
+    
+    -- Try getexecutorname if available
+    local success, execName = pcall(function()
+        if getexecutorname then
+            return getexecutorname()
+        end
+    end)
+    if success and execName and execName ~= "" then
+        return execName
+    end
+    
+    -- Check if on mobile (likely Delta iOS or similar)
+    if UserInputService.TouchEnabled then
+        return "Delta iOS / Mobile Executor"
+    end
+    
+    return "Unknown Executor"
+end
+
+local executor = detectExecutor()
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "MakerCS"
@@ -34,17 +136,28 @@ Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1,0,0,50)
 title.BackgroundColor3 = Color3.fromRGB(0,100,200)
-title.Text = "MakerAdminCS [Delta iOS]"
+title.Text = "MakerCS [Delta iOS]"
 title.TextColor3 = Color3.new(1,1,1)
 title.TextScaled = true
 title.Font = Enum.Font.GothamBold
 title.Parent = mainFrame
 Instance.new("UICorner", title).CornerRadius = UDim.new(0, 10)
 
+-- Executor display label
+local execLabel = Instance.new("TextLabel")
+execLabel.Size = UDim2.new(1,0,0,25)
+execLabel.Position = UDim2.new(0,0,0,50)
+execLabel.BackgroundColor3 = Color3.fromRGB(0,70,140)
+execLabel.Text = "Executor: " .. executor
+execLabel.TextColor3 = Color3.new(1,1,0.5)
+execLabel.TextScaled = true
+execLabel.Font = Enum.Font.GothamBold
+execLabel.Parent = mainFrame
+
 -- Tabs
 local tabFrame = Instance.new("Frame")
 tabFrame.Size = UDim2.new(1,0,0,40)
-tabFrame.Position = UDim2.new(0,0,0,50)
+tabFrame.Position = UDim2.new(0,0,0,75)
 tabFrame.BackgroundColor3 = Color3.fromRGB(30,30,30)
 tabFrame.Parent = mainFrame
 Instance.new("UICorner", tabFrame)
@@ -98,13 +211,13 @@ Instance.new("UICorner", icon).CornerRadius = UDim.new(0, 20)
 -- Content Frames
 local mainContent = Instance.new("Frame")
 mainContent.Size = UDim2.new(1,0,1,-130)
-mainContent.Position = UDim2.new(0,0,0,100)
+mainContent.Position = UDim2.new(0,0,0,125)
 mainContent.BackgroundTransparency = 1
 mainContent.Parent = mainFrame
 
 local scriptsContent = Instance.new("ScrollingFrame")
 scriptsContent.Size = UDim2.new(1,0,1,-130)
-scriptsContent.Position = UDim2.new(0,0,0,100)
+scriptsContent.Position = UDim2.new(0,0,0,125)
 scriptsContent.BackgroundTransparency = 1
 scriptsContent.Visible = false
 scriptsContent.CanvasSize = UDim2.new(0,0,0,350)
@@ -176,21 +289,28 @@ local function toggleFly()
         
         table.insert(cons, RS.RenderStepped:Connect(function()
             if not flying then return end
-            local cam = workspace.CurrentCamera
             
-            -- Get movement direction from joystick (MoveDirection) or keyboard
+            -- Get current camera
+            local cam = workspace.CurrentCamera
             local moveVector = hum.MoveDirection
             local dir = Vector3.new()
             
-            if moveVector.Magnitude > 0 then
-                -- Convert joystick direction to camera-relative movement
-                -- X is strafe (right/left), Z is forward/back
+            if moveVector.Magnitude > 0.1 then
+                -- Get the camera's right and look vectors
+                local camRight = cam.CFrame.RightVector
+                local camLook = cam.CFrame.LookVector
+                
+                -- MoveDirection gives us: X = strafe (right/left), Z = forward/back
                 local forwardMovement = -moveVector.Z
                 local rightMovement = moveVector.X
                 
-                -- Calculate direction relative to camera
-                dir = (cam.CFrame.RightVector * rightMovement) + (cam.CFrame.LookVector * forwardMovement)
-                dir = dir.Unit
+                -- Combine for camera-relative movement
+                dir = (camRight * rightMovement) + (camLook * forwardMovement)
+                
+                -- Normalize if we have movement
+                if dir.Magnitude > 0 then
+                    dir = dir.Unit
+                end
             else
                 -- PC keyboard controls fallback
                 if UIS:IsKeyDown(Enum.KeyCode.W) then dir += cam.CFrame.LookVector end
@@ -200,7 +320,7 @@ local function toggleFly()
                 if dir.Magnitude > 0 then dir = dir.Unit end
             end
             
-            -- Vertical movement (same for both mobile and PC)
+            -- Vertical movement
             if UIS:IsKeyDown(Enum.KeyCode.Space) then
                 dir = dir + Vector3.new(0, 1, 0)
             end
@@ -208,16 +328,19 @@ local function toggleFly()
                 dir = dir + Vector3.new(0, -1, 0)
             end
             
+            -- Apply velocity
             if dir.Magnitude > 0 then
                 bv.Velocity = dir.Unit * flySpeed
             else
                 bv.Velocity = Vector3.new()
             end
+            
+            -- Face the camera direction
             bg.CFrame = cam.CFrame
         end))
         
         if UserInputService.TouchEnabled then
-            notify("Fly Enabled - Move joystick to fly in that direction! Space/Crouch = Up/Down")
+            notify("Fly Enabled - Move joystick to fly in that direction! (Camera-relative)")
         else
             notify("Fly Enabled - Use WASD to move, Space/Ctrl for up/down")
         end
@@ -321,4 +444,4 @@ end)
 -- Get game info and show welcome notification
 local gameName = game.Name or "Unknown Game"
 local deviceType = UserInputService.TouchEnabled and "Mobile (iOS/Android)" or "PC"
-notify("MakerAdminCS Loaded!\nGame: " .. gameName .. "\nDevice: " .. deviceType .. "\nAll scripts are in the Scripts tab!")
+notify("MakerCS Loaded!\nExecutor: " .. executor .. "\nGame: " .. gameName .. "\nDevice: " .. deviceType .. "\nAll scripts are in the Scripts tab!")
