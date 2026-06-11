@@ -74,7 +74,7 @@ mainFrame.Parent = gui
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1,0,0,50)
+title.Size = UDim2.new(1,0,0,40)
 title.BackgroundColor3 = Color3.fromRGB(0,100,200)
 title.Text = "MakerCS [Delta iOS]"
 title.TextColor3 = Color3.new(1,1,1)
@@ -85,8 +85,8 @@ Instance.new("UICorner", title).CornerRadius = UDim.new(0, 10)
 
 -- Username display
 local userLabel = Instance.new("TextLabel")
-userLabel.Size = UDim2.new(1,0,0,25)
-userLabel.Position = UDim2.new(0,0,0,50)
+userLabel.Size = UDim2.new(1,0,0,20)
+userLabel.Position = UDim2.new(0,0,0,40)
 userLabel.BackgroundColor3 = Color3.fromRGB(0,70,140)
 userLabel.Text = "User: " .. USERNAME
 userLabel.TextColor3 = Color3.new(1,1,0.5)
@@ -96,8 +96,8 @@ userLabel.Parent = mainFrame
 
 -- Tabs
 local tabFrame = Instance.new("Frame")
-tabFrame.Size = UDim2.new(1,0,0,40)
-tabFrame.Position = UDim2.new(0,0,0,75)
+tabFrame.Size = UDim2.new(1,0,0,35)
+tabFrame.Position = UDim2.new(0,0,0,60)
 tabFrame.BackgroundColor3 = Color3.fromRGB(30,30,30)
 tabFrame.Parent = mainFrame
 Instance.new("UICorner", tabFrame)
@@ -137,8 +137,8 @@ Instance.new("UICorner", ssTabBtn)
 
 -- Minimize Button
 local minBtn = Instance.new("TextButton")
-minBtn.Size = UDim2.new(0,35,0,35)
-minBtn.Position = UDim2.new(1,-40,0,8)
+minBtn.Size = UDim2.new(0,30,0,30)
+minBtn.Position = UDim2.new(1,-35,0,5)
 minBtn.BackgroundColor3 = Color3.fromRGB(180,40,40)
 minBtn.Text = "✕"
 minBtn.TextColor3 = Color3.new(1,1,1)
@@ -159,18 +159,18 @@ icon.Draggable = true
 icon.Parent = gui
 Instance.new("UICorner", icon).CornerRadius = UDim.new(0, 20)
 
--- Content Frames
+-- Content Frames (positioned below tabs)
 local mainContent = Instance.new("ScrollingFrame")
-mainContent.Size = UDim2.new(1,0,1,-130)
-mainContent.Position = UDim2.new(0,0,0,100)
+mainContent.Size = UDim2.new(1,0,1,-105)
+mainContent.Position = UDim2.new(0,0,0,95)
 mainContent.BackgroundTransparency = 1
 mainContent.CanvasSize = UDim2.new(0,0,0,0)
 mainContent.ScrollBarThickness = 8
 mainContent.Parent = mainFrame
 
 local scriptsContent = Instance.new("ScrollingFrame")
-scriptsContent.Size = UDim2.new(1,0,1,-130)
-scriptsContent.Position = UDim2.new(0,0,0,100)
+scriptsContent.Size = UDim2.new(1,0,1,-105)
+scriptsContent.Position = UDim2.new(0,0,0,95)
 scriptsContent.BackgroundTransparency = 1
 scriptsContent.Visible = false
 scriptsContent.CanvasSize = UDim2.new(0,0,0,0)
@@ -178,8 +178,8 @@ scriptsContent.ScrollBarThickness = 8
 scriptsContent.Parent = mainFrame
 
 local ssContent = Instance.new("ScrollingFrame")
-ssContent.Size = UDim2.new(1,0,1,-130)
-ssContent.Position = UDim2.new(0,0,0,100)
+ssContent.Size = UDim2.new(1,0,1,-105)
+ssContent.Position = UDim2.new(0,0,0,95)
 ssContent.BackgroundTransparency = 1
 ssContent.Visible = false
 ssContent.CanvasSize = UDim2.new(0,0,0,0)
