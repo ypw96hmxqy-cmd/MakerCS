@@ -208,47 +208,22 @@ local function notify(txt)
     end)
 end
 
-local function makeButton(parent, text, toggleFunc, state)
+local function createButton(parent, text, callback, order, color)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9,0,0,50)
-    btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-    btn.Text = text
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.TextScaled = true
-    btn.Font = Enum.Font.GothamSemibold
-    btn.Parent = parent
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
-
-    btn.MouseButton1Click:Connect(function()
-        if toggleFunc then
-            toggleFunc()
-            if state then
-                btn.BackgroundColor3 = state[1] and Color3.fromRGB(0,170,0) or Color3.fromRGB(40,40,40)
-            end
-        end
-    end)
-    return btn
-end
-
-local function makeScriptButton(parent, text, url, order)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9,0,0,50)
-    btn.BackgroundColor3 = Color3.fromRGB(50,50,70)
+    btn.Size = UDim2.new(0.95, 0, 0, 50)
+    btn.BackgroundColor3 = color or Color3.fromRGB(40,40,40)
     btn.Text = text
     btn.TextColor3 = Color3.new(1,1,1)
     btn.TextScaled = true
     btn.Font = Enum.Font.GothamSemibold
     btn.LayoutOrder = order
     btn.Parent = parent
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
-
-    btn.MouseButton1Click:Connect(function()
-        notify("Loading " .. text .. "...")
-        pcall(function()
-            loadstring(game:HttpGet(url))()
-        end)
-        notify(text .. " Loaded!")
-    end)
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = btn
+    
+    btn.MouseButton1Click:Connect(callback)
     return btn
 end
 
@@ -387,49 +362,64 @@ local function toggleInvisible()
 end
 
 -- Main tab buttons
-local flyBtn = makeButton(mainContent, "Toggle Fly", toggleFly, {flying})
-local noclipBtn = makeButton(mainContent, "Toggle Noclip", toggleNoclip, {noclipping})
-local espBtn = makeButton(mainContent, "Toggle ESP", toggleESP, {espOn})
-local discoBtn = makeButton(mainContent, "Toggle Disco", toggleDisco, {discoOn})
-local invisBtn = makeButton(mainContent, "Toggle Invisible", toggleInvisible, {invisible})
-
-flyBtn.LayoutOrder = 1
-noclipBtn.LayoutOrder = 2
-espBtn.LayoutOrder = 3
-discoBtn.LayoutOrder = 4
-invisBtn.LayoutOrder = 5
+createButton(mainContent, "Toggle Fly", toggleFly, 1, Color3.fromRGB(40,40,40))
+createButton(mainContent, "Toggle Noclip", toggleNoclip, 2, Color3.fromRGB(40,40,40))
+createButton(mainContent, "Toggle ESP", toggleESP, 3, Color3.fromRGB(40,40,40))
+createButton(mainContent, "Toggle Disco", toggleDisco, 4, Color3.fromRGB(40,40,40))
+createButton(mainContent, "Toggle Invisible", toggleInvisible, 5, Color3.fromRGB(40,40,40))
 
 -- === SCRIPTS TAB ===
-makeScriptButton(scriptsContent, "Load Infinite Yield", "https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source", 1)
-makeScriptButton(scriptsContent, "Load Tiger X V3.5", "https://raw.githubusercontent.com/balintTheDevX/Tiger-X-V3/main/Tiger%20X%20V3.5%20Fixed", 2)
-makeScriptButton(scriptsContent, "Load Vertex MM2", "https://raw.smokingscripts.org/vertex.lua", 3)
-makeScriptButton(scriptsContent, "Load Pastefy Script", "https://pastefy.app/iPp0a0Nx/raw", 4)
-makeScriptButton(scriptsContent, "Load Emotes Script", "https://raw.githubusercontent.com/7yd7/Hub/refs/heads/Branch/GUIS/Emotes.lua", 5)
+createButton(scriptsContent, "Load Infinite Yield", function()
+    notify("Loading Infinite Yield...")
+    pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+        notify("Infinite Yield Loaded!")
+    end)
+end, 1, Color3.fromRGB(50,50,70))
+
+createButton(scriptsContent, "Load Tiger X V3.5", function()
+    notify("Loading Tiger X V3.5...")
+    pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/balintTheDevX/Tiger-X-V3/main/Tiger%20X%20V3.5%20Fixed"))()
+        notify("Tiger X V3.5 Loaded!")
+    end)
+end, 2, Color3.fromRGB(50,50,70))
+
+createButton(scriptsContent, "Load Vertex MM2", function()
+    notify("Loading Vertex MM2...")
+    pcall(function()
+        loadstring(game:HttpGet("https://raw.smokingscripts.org/vertex.lua"))()
+        notify("Vertex MM2 Loaded!")
+    end)
+end, 3, Color3.fromRGB(50,50,70))
+
+createButton(scriptsContent, "Load Pastefy Script", function()
+    notify("Loading Pastefy Script...")
+    pcall(function()
+        loadstring(game:HttpGet("https://pastefy.app/iPp0a0Nx/raw"))()
+        notify("Pastefy Script Loaded!")
+    end)
+end, 4, Color3.fromRGB(50,50,70))
+
+createButton(scriptsContent, "Load Emotes Script", function()
+    notify("Loading Emotes Script...")
+    pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/7yd7/Hub/refs/heads/Branch/GUIS/Emotes.lua"))()
+        notify("Emotes Script Loaded!")
+    end)
+end, 5, Color3.fromRGB(50,50,70))
 
 -- === SERVERSIDE SCRIPTS TAB ===
 -- Backdoor Checker button
-local checkBtn = Instance.new("TextButton")
-checkBtn.Size = UDim2.new(0.9,0,0,50)
-checkBtn.BackgroundColor3 = Color3.fromRGB(100,50,50)
-checkBtn.Text = "⚠️ Check if Game is Backdoored ⚠️"
-checkBtn.TextColor3 = Color3.new(1,1,1)
-checkBtn.TextScaled = true
-checkBtn.Font = Enum.Font.GothamBold
-checkBtn.LayoutOrder = 0
-checkBtn.Parent = ssContent
-Instance.new("UICorner", checkBtn).CornerRadius = UDim.new(0,8)
-
-checkBtn.MouseButton1Click:Connect(function()
+createButton(ssContent, "⚠️ Check if Game is Backdoored ⚠️", function()
     if isGameBackdoored() then
         notify("✅ This game IS backdoored! Server-side scripts should work!")
-        checkBtn.BackgroundColor3 = Color3.fromRGB(0,170,0)
     else
         notify("❌ This game is NOT backdoored! Server-side scripts will NOT work!")
-        checkBtn.BackgroundColor3 = Color3.fromRGB(170,0,0)
     end
-end)
+end, 0, Color3.fromRGB(100,50,50))
 
--- Server-side scripts (DIRECT EXECUTION, not loadstring)
+-- Server-side scripts
 local ssScripts = {
     {"HD Admin Giver", function() pcall(function() require(7192763922).load("ThatOneScripter1234") end) end},
     {"OP GUI Sigma", function() pcall(function() require(0x7435b09c4+0x38501a58+0x5a59*-0xa0396):opss144anz("ThatOneScripter1234") end) end},
@@ -454,28 +444,16 @@ local ssScripts = {
     {"Adonis Ranker", function() pcall(function() require(5436326937)("ThatOneScripter1234") end) end}
 }
 
-local order = 1
+local ssOrder = 1
 for _, scriptData in pairs(ssScripts) do
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9,0,0,50)
-    btn.BackgroundColor3 = Color3.fromRGB(70,50,50)
-    btn.Text = scriptData[1]
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.TextScaled = true
-    btn.Font = Enum.Font.GothamSemibold
-    btn.LayoutOrder = order
-    btn.Parent = ssContent
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
-    
-    local func = scriptData[2]
-    btn.MouseButton1Click:Connect(function()
+    createButton(ssContent, scriptData[1], function()
         if not isGameBackdoored() then
             notify("⚠️ This game may not be backdoored! This script may not work!")
         end
         notify("Executing: " .. scriptData[1])
-        pcall(func)
-    end)
-    order = order + 1
+        pcall(scriptData[2])
+    end, ssOrder, Color3.fromRGB(70,50,50))
+    ssOrder = ssOrder + 1
 end
 
 -- Loadstring server-side scripts
@@ -486,28 +464,16 @@ local ssLoadstringScripts = {
 }
 
 for _, scriptData in pairs(ssLoadstringScripts) do
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9,0,0,50)
-    btn.BackgroundColor3 = Color3.fromRGB(70,50,70)
-    btn.Text = scriptData[1]
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.TextScaled = true
-    btn.Font = Enum.Font.GothamSemibold
-    btn.LayoutOrder = order
-    btn.Parent = ssContent
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
-    
-    local url = scriptData[2]
-    btn.MouseButton1Click:Connect(function()
+    createButton(ssContent, scriptData[1], function()
         if not isGameBackdoored() then
             notify("⚠️ This game may not be backdoored! This script may not work!")
         end
         notify("Loading: " .. scriptData[1])
         pcall(function()
-            loadstring(game:HttpGet(url))()
+            loadstring(game:HttpGet(scriptData[2]))()
         end)
-    end)
-    order = order + 1
+    end, ssOrder, Color3.fromRGB(70,50,70))
+    ssOrder = ssOrder + 1
 end
 
 -- Update canvas sizes
@@ -535,7 +501,6 @@ mainTabBtn.MouseButton1Click:Connect(function()
     mainTabBtn.BackgroundColor3 = Color3.fromRGB(0,120,255)
     scriptsTabBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
     ssTabBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-    updateCanvasSize(mainContent)
 end)
 
 scriptsTabBtn.MouseButton1Click:Connect(function()
@@ -545,7 +510,6 @@ scriptsTabBtn.MouseButton1Click:Connect(function()
     scriptsTabBtn.BackgroundColor3 = Color3.fromRGB(0,120,255)
     mainTabBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
     ssTabBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-    updateCanvasSize(scriptsContent)
 end)
 
 ssTabBtn.MouseButton1Click:Connect(function()
@@ -555,7 +519,6 @@ ssTabBtn.MouseButton1Click:Connect(function()
     ssTabBtn.BackgroundColor3 = Color3.fromRGB(0,120,255)
     mainTabBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
     scriptsTabBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-    updateCanvasSize(ssContent)
 end)
 
 -- Minimize / Icon
