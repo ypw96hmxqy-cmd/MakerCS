@@ -1,4 +1,4 @@
--- MakerCS - Universal Executor Script
+-- MakerCS - Universal Executor Script with AI
 -- Auto-detects executor, mobile-friendly, works on any executor
 
 -- Detect executor
@@ -71,8 +71,6 @@ local Lighting = game:GetService("Lighting")
 local SG = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerScriptService = game:GetService("ServerScriptService")
-local ServerStorage = game:GetService("ServerStorage")
 local HttpService = game:GetService("HttpService")
 
 local plr = Players.LocalPlayer
@@ -88,8 +86,375 @@ local discoOn = false
 local flySpeed = 50
 local cons = {}
 local esps = {}
+local aiChatHistory = {}
 
--- Character respawn handler
+-- ============ AI API FUNCTIONS ============
+
+-- Free AI APIs (no API key required)
+local AI_APIS = {
+    {
+        name = "GPT4Free",
+        url = "https://api.g4f.icu/gpt",
+        format = function(prompt) 
+            return {
+                messages = {{role = "user", content = prompt}},
+                model = "gpt-3.5-turbo"
+            }
+        end,
+        parse = function(response)
+            local decoded = HttpService:JSONDecode(response)
+            return decoded.choices and decoded.choices[1].message.content or "API Error"
+        end
+    },
+    {
+        name = "Koala AI",
+        url = "https://api.koala.sh/v1/chat/completions",
+        format = function(prompt)
+            return {
+                messages = {{role = "user", content = prompt}},
+                model = "koala-7b"
+            }
+        end,
+        parse = function(response)
+            local decoded = HttpService:JSONDecode(response)
+            return decoded.choices and decoded.choices[1].message.content or "API Error"
+        end
+    },
+    {
+        name = "ChatBot",
+        url = "https://chatbot.theb.ai/api/chat-process",
+        format = function(prompt)
+            return {
+                prompt = prompt,
+                options = {}
+            }
+        end,
+        parse = function(response)
+            local decoded = HttpService:JSONDecode(response)
+            return decoded.text or decoded.message or "API Error"
+        end
+    }
+}
+
+local currentAPI = 1
+local function callAIAPI(prompt)
+    local api = AI_APIS[currentAPI]
+    local success, result = pcall(function()
+        local body = api.format(prompt)
+        local response = syn and syn.request or request or http_request
+        if response then
+            local res = response({
+                Url = api.url,
+                Method = "POST",
+                Headers = {
+                    ["Content-Type"] = "application/json"
+                },
+                Body = HttpService:JSONEncode(body)
+            })
+            if res and res.Body then
+                return api.parse(res.Body)
+            end
+        end
+        return nil
+    end)
+    
+    if success and result then
+        return result
+    else
+        return getLocalResponse(prompt)
+    end
+end
+
+-- Local AI fallback (works offline)
+local function getLocalResponse(prompt)
+    prompt = prompt:lower()
+    
+    local responses = {
+        {keywords = {"fly", "how to fly"}, response = "To fly, go to the Main tab and click 'Toggle Fly'. Use WASD keys (or joystick on mobile) to move. Space = up, Ctrl = down."},
+        {keywords = {"noclip", "walk through walls"}, response = "Noclip lets you walk through walls. Enable it from the Main tab. Works client-side only."},
+        {keywords = {"esp", "see players"}, response = "ESP shows players through walls with names and health bars. Toggle it from the Main tab."},
+        {keywords = {"speed", "walkspeed"}, response = "Change your walk speed using 'Toggle Speed' in Main tab, or use Client Scripts tab for presets (100 or 16)."},
+        {keywords = {"jump", "jumppower"}, response = "Boost jump power using 'Toggle Jump' in Main tab. Default is 50, boost to 200."},
+        {keywords = {"invisible", "hide"}, response = "Invisibility makes your character transparent. Toggle from Main tab. Client-side only."},
+        {keywords = {"disco", "rainbow"}, response = "Disco mode creates rainbow lighting. Toggle from Main tab for ambient effects."},
+        {keywords = {"executor", "execute script"}, response = "Use Executor tab to run any Lua script. Paste code and click Execute."},
+        {keywords = {"scan", "scanner"}, response = "Scan Game button analyzes the game - shows players, remote events, backdoor indicators, admin scripts."},
+        {keywords = {"ss", "serverside"}, response = "SS Scripts attempt server-side effects. Only work in backdoored games. Try them from SS Scripts tab."},
+        {keywords = {"infinite yield", "iy"}, response = "Load Infinite Yield admin script from Client Scripts tab."},
+        {keywords = {"skybox", "sky"}, response = "Change skybox using 'Custom Skybox' in Client Scripts tab. Uses decal ID 133260261393194."},
+        {keywords = {"hello", "hi", "hey"}, response = "Hello! I'm your AI assistant. Ask about: fly, noclip, esp, speed, jump, invisible, disco, executor, scan, ss scripts, credits, or type 'help'."},
+        {keywords = {"help", "commands"}, response = "📢 Available: Fly, Noclip, ESP, Speed, Jump, Invisible, Disco, Executor, Scan, SS Scripts, Infinite Yield, Skybox, Credits, Game Info"},
+        {keywords = {"who are you", "what are you"}, response = "I'm the MakerCS AI assistant! I help you understand all features of this script."},
+        {keywords = {"creator", "made by", "credits"}, response = "MakerCS was created by ThatOneScripter1234. Check the Credits tab for full details!"},
+        {keywords = {"game name", "current game"}, response = "Current game: " .. game.Name .. " (Place ID: " .. placeId .. ")"},
+        {keywords = {"players", "how many"}, response = "Players online: " .. #Players:GetPlayers()},
+    }
+    
+    for _, item in pairs(responses) do
+        for _, keyword in pairs(item.keywords) do
+            if prompt:find(keyword) then
+                return item.response
+            end
+        end
+    end
+    
+    return "I'm not sure about that. Try asking about: fly, noclip, esp, speed, jump, invisible, disco, executor, scan, ss scripts, infinite yield, skybox, credits, help, or game info!"
+end
+
+-- ============ AI CHAT GUI ============
+local aiFrame = nil
+local chatLog = nil
+local aiInput = nil
+
+local function createAIChat()
+    local aiGui = Instance.new("ScreenGui")
+    aiGui.Name = "AIChat"
+    aiGui.Parent = plr.PlayerGui
+    
+    aiFrame = Instance.new("Frame")
+    if isMobile then
+        aiFrame.Size = UDim2.new(0, 350, 0, 480)
+        aiFrame.Position = UDim2.new(0.02, 0, 0.05, 0)
+    else
+        aiFrame.Size = UDim2.new(0, 380, 0, 500)
+        aiFrame.Position = UDim2.new(0.02, 0, 0.08, 0)
+    end
+    aiFrame.BackgroundColor3 = Color3.fromRGB(15,15,25)
+    aiFrame.BackgroundTransparency = 0.05
+    aiFrame.Active = true
+    aiFrame.Draggable = true
+    aiFrame.Visible = false
+    aiFrame.Parent = aiGui
+    Instance.new("UICorner", aiFrame).CornerRadius = UDim.new(0, 12)
+    
+    local aiTitle = Instance.new("TextLabel")
+    aiTitle.Size = UDim2.new(1,0,0,45)
+    aiTitle.BackgroundColor3 = Color3.fromRGB(100,50,150)
+    aiTitle.Text = "🤖 AI Assistant (API Powered)"
+    aiTitle.TextColor3 = Color3.new(1,1,1)
+    aiTitle.TextScaled = true
+    aiTitle.Font = Enum.Font.GothamBold
+    aiTitle.Parent = aiFrame
+    Instance.new("UICorner", aiTitle).CornerRadius = UDim.new(0, 12)
+    
+    local apiStatus = Instance.new("TextLabel")
+    apiStatus.Size = UDim2.new(0.5,0,0,15)
+    apiStatus.Position = UDim2.new(0.5,0,1,-18)
+    apiStatus.BackgroundTransparency = 1
+    apiStatus.Text = "🌐 Using API"
+    apiStatus.TextColor3 = Color3.fromRGB(100,255,100)
+    apiStatus.TextScaled = true
+    apiStatus.Font = Enum.Font.Gotham
+    apiStatus.Parent = aiTitle
+    
+    local aiClose = Instance.new("TextButton")
+    aiClose.Size = UDim2.new(0,35,0,35)
+    aiClose.Position = UDim2.new(1,-40,0,5)
+    aiClose.BackgroundColor3 = Color3.fromRGB(200,50,50)
+    aiClose.Text = "✕"
+    aiClose.TextColor3 = Color3.new(1,1,1)
+    aiClose.TextScaled = true
+    aiClose.Font = Enum.Font.GothamBold
+    aiClose.Parent = aiTitle
+    Instance.new("UICorner", aiClose).CornerRadius = UDim.new(0, 8)
+    
+    chatLog = Instance.new("ScrollingFrame")
+    chatLog.Size = UDim2.new(1,0,1,-105)
+    chatLog.Position = UDim2.new(0,0,0,50)
+    chatLog.BackgroundColor3 = Color3.fromRGB(20,20,35)
+    chatLog.CanvasSize = UDim2.new(0,0,0,0)
+    chatLog.ScrollBarThickness = 6
+    chatLog.Parent = aiFrame
+    Instance.new("UICorner", chatLog).CornerRadius = UDim.new(0, 8)
+    
+    local chatLayout = Instance.new("UIListLayout")
+    chatLayout.Parent = chatLog
+    chatLayout.Padding = UDim.new(0, 8)
+    chatLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    
+    local inputFrame = Instance.new("Frame")
+    inputFrame.Size = UDim2.new(1,0,0,55)
+    inputFrame.Position = UDim2.new(0,0,1,-55)
+    inputFrame.BackgroundColor3 = Color3.fromRGB(30,30,45)
+    inputFrame.Parent = aiFrame
+    Instance.new("UICorner", inputFrame).CornerRadius = UDim.new(0, 0)
+    
+    aiInput = Instance.new("TextBox")
+    aiInput.Size = UDim2.new(0.72, -10, 1, -10)
+    aiInput.Position = UDim2.new(0.02, 0, 0.05, 0)
+    aiInput.BackgroundColor3 = Color3.fromRGB(25,25,40)
+    aiInput.PlaceholderText = "Ask me anything..."
+    aiInput.Text = ""
+    aiInput.TextColor3 = Color3.new(1,1,1)
+    aiInput.TextScaled = true
+    aiInput.Font = Enum.Font.Gotham
+    aiInput.Parent = inputFrame
+    Instance.new("UICorner", aiInput).CornerRadius = UDim.new(0, 8)
+    
+    local aiSend = Instance.new("TextButton")
+    aiSend.Size = UDim2.new(0.23, 0, 1, -10)
+    aiSend.Position = UDim2.new(0.75, 0, 0.05, 0)
+    aiSend.BackgroundColor3 = Color3.fromRGB(0,150,0)
+    aiSend.Text = "SEND"
+    aiSend.TextColor3 = Color3.new(1,1,1)
+    aiSend.TextScaled = true
+    aiSend.Font = Enum.Font.GothamBold
+    aiSend.Parent = inputFrame
+    Instance.new("UICorner", aiSend).CornerRadius = UDim.new(0, 8)
+    
+    local loadingFrame = Instance.new("Frame")
+    loadingFrame.Size = UDim2.new(0.3,0,0,40)
+    loadingFrame.Position = UDim2.new(0.35,0,0.4,0)
+    loadingFrame.BackgroundColor3 = Color3.fromRGB(0,0,0)
+    loadingFrame.BackgroundTransparency = 0.5
+    loadingFrame.Visible = false
+    loadingFrame.Parent = aiFrame
+    Instance.new("UICorner", loadingFrame).CornerRadius = UDim.new(0, 8)
+    
+    local loadingText = Instance.new("TextLabel")
+    loadingText.Size = UDim2.new(1,0,1,0)
+    loadingText.BackgroundTransparency = 1
+    loadingText.Text = "🤔 Thinking..."
+    loadingText.TextColor3 = Color3.new(1,1,1)
+    loadingText.TextScaled = true
+    loadingText.Font = Enum.Font.GothamBold
+    loadingText.Parent = loadingFrame
+    
+    local function addChatMessage(sender, message, isUser)
+        local msgFrame = Instance.new("Frame")
+        if isUser then
+            msgFrame.Size = UDim2.new(0.88, 0, 0, 0)
+            msgFrame.Position = UDim2.new(0.1, 0, 0, 0)
+        else
+            msgFrame.Size = UDim2.new(0.88, 0, 0, 0)
+            msgFrame.Position = UDim2.new(0.02, 0, 0, 0)
+        end
+        msgFrame.BackgroundColor3 = isUser and Color3.fromRGB(50,50,80) or Color3.fromRGB(80,50,100)
+        msgFrame.BackgroundTransparency = 0.15
+        msgFrame.Parent = chatLog
+        Instance.new("UICorner", msgFrame).CornerRadius = UDim.new(0, 10)
+        
+        local senderLabel = Instance.new("TextLabel")
+        senderLabel.Size = UDim2.new(1,0,0,22)
+        senderLabel.BackgroundTransparency = 1
+        senderLabel.Text = isUser and "👤 You:" : "🤖 AI:"
+        senderLabel.TextColor3 = isUser and Color3.fromRGB(100,200,255) or Color3.fromRGB(255,150,100)
+        senderLabel.TextScaled = true
+        senderLabel.TextXAlignment = Enum.TextXAlignment.Left
+        senderLabel.Font = Enum.Font.GothamBold
+        senderLabel.Parent = msgFrame
+        
+        local msgLabel = Instance.new("TextLabel")
+        msgLabel.Size = UDim2.new(1,0,0,0)
+        msgLabel.Position = UDim2.new(0,5,0,22)
+        msgLabel.BackgroundTransparency = 1
+        msgLabel.Text = message
+        msgLabel.TextColor3 = Color3.new(1,1,1)
+        msgLabel.TextScaled = true
+        msgLabel.TextXAlignment = Enum.TextXAlignment.Left
+        msgLabel.TextWrapped = true
+        msgLabel.Font = Enum.Font.Gotham
+        msgLabel.Parent = msgFrame
+        
+        local lines = math.max(1, math.ceil(#message / 45))
+        local height = 45 + (lines * 18)
+        msgFrame.Size = UDim2.new(0.88, 0, 0, height)
+        msgLabel.Size = UDim2.new(1, -10, 0, height - 25)
+        
+        task.wait(0.1)
+        chatLog.CanvasPosition = Vector2.new(0, chatLog.CanvasSize.Y.Offset)
+    end
+    
+    local function updateCanvasSize()
+        task.wait(0.1)
+        local totalHeight = 10
+        for _, child in pairs(chatLog:GetChildren()) do
+            if child:IsA("Frame") then
+                totalHeight = totalHeight + child.Size.Y.Offset + 8
+            end
+        end
+        chatLog.CanvasSize = UDim2.new(0, 0, 0, totalHeight + 20)
+        chatLog.CanvasPosition = Vector2.new(0, chatLog.CanvasSize.Y.Offset)
+    end
+    
+    local function sendToAI()
+        local question = aiInput.Text
+        if question == "" then return end
+        
+        addChatMessage("You", question, true)
+        updateCanvasSize()
+        aiInput.Text = ""
+        
+        loadingFrame.Visible = true
+        
+        local response = nil
+        local usedAPI = false
+        
+        for i = 1, 3 do
+            local api = AI_APIS[i]
+            local success, result = pcall(function()
+                local httpFunc = syn and syn.request or request or http_request
+                if httpFunc then
+                    local res = httpFunc({
+                        Url = api.url,
+                        Method = "POST",
+                        Headers = {
+                            ["Content-Type"] = "application/json"
+                        },
+                        Body = HttpService:JSONEncode(api.format(question))
+                    })
+                    if res and res.Body then
+                        local decoded = HttpService:JSONDecode(res.Body)
+                        if api.name == "GPT4Free" then
+                            return decoded.choices and decoded.choices[1].message.content
+                        elseif api.name == "Koala AI" then
+                            return decoded.choices and decoded.choices[1].message.content
+                        else
+                            return decoded.text or decoded.message
+                        end
+                    end
+                end
+                return nil
+            end)
+            
+            if success and result and result ~= "API Error" and result ~= nil then
+                response = result
+                usedAPI = true
+                apiStatus.Text = "🌐 Using " .. api.name
+                apiStatus.TextColor3 = Color3.fromRGB(100,255,100)
+                break
+            end
+        end
+        
+        if not response then
+            response = getLocalResponse(question)
+            usedAPI = false
+            apiStatus.Text = "💾 Using Local AI"
+            apiStatus.TextColor3 = Color3.fromRGB(255,200,100)
+        end
+        
+        loadingFrame.Visible = false
+        addChatMessage("AI", response, false)
+        updateCanvasSize()
+    end
+    
+    aiSend.MouseButton1Click:Connect(sendToAI)
+    aiInput.FocusLost:Connect(function(enterPressed)
+        if enterPressed then sendToAI() end
+    end)
+    
+    aiClose.MouseButton1Click:Connect(function()
+        aiFrame.Visible = false
+    end)
+    
+    task.wait(0.5)
+    addChatMessage("AI", "Hello! I'm your AI assistant powered by GPT API! I can help you with MakerCS features. Ask me anything about fly, noclip, esp, speed, jump, invisible, disco, executor, scan, ss scripts, credits, or type 'help'!", false)
+    updateCanvasSize()
+    
+    return aiFrame
+end
+
+-- ============ CHARACTER HANDLER ============
 plr.CharacterAdded:Connect(function(newChar)
     char = newChar
     hum = char:WaitForChild("Humanoid")
@@ -113,7 +478,7 @@ plr.CharacterAdded:Connect(function(newChar)
     end
 end)
 
--- Create GUI
+-- ============ CREATE MAIN GUI ============
 local gui = Instance.new("ScreenGui")
 gui.Name = "MakerCS"
 gui.ResetOnSpawn = false
@@ -143,7 +508,7 @@ titleBar.Parent = mainFrame
 Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 12)
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1,-60,1,0)
+title.Size = UDim2.new(1,-90,1,0)
 title.Position = UDim2.new(0,10,0,0)
 title.BackgroundTransparency = 1
 title.Text = "MakerCS"
@@ -174,6 +539,18 @@ gameLabel.TextXAlignment = Enum.TextXAlignment.Left
 gameLabel.Font = Enum.Font.Gotham
 gameLabel.Parent = titleBar
 
+-- AI Button
+local aiButton = Instance.new("TextButton")
+aiButton.Size = UDim2.new(0,45,0,40)
+aiButton.Position = UDim2.new(1,-95,0,5)
+aiButton.BackgroundColor3 = Color3.fromRGB(100,50,150)
+aiButton.Text = "🤖"
+aiButton.TextColor3 = Color3.new(1,1,1)
+aiButton.TextScaled = true
+aiButton.Font = Enum.Font.GothamBold
+aiButton.Parent = titleBar
+Instance.new("UICorner", aiButton).CornerRadius = UDim.new(0, 20)
+
 -- Minimize Button
 local minBtn = Instance.new("TextButton")
 minBtn.Size = UDim2.new(0,35,0,35)
@@ -194,12 +571,13 @@ tabBar.BackgroundColor3 = Color3.fromRGB(30,30,45)
 tabBar.Parent = mainFrame
 Instance.new("UICorner", tabBar).CornerRadius = UDim.new(0, 0)
 
--- Tabs
+-- Tabs (5 tabs including Credits)
 local tabs = {
     {name = "Main", color = Color3.fromRGB(0,120,200)},
     {name = "Client Scripts", color = Color3.fromRGB(45,45,65)},
     {name = "SS Scripts", color = Color3.fromRGB(65,45,45)},
-    {name = "Executor", color = Color3.fromRGB(45,55,65)}
+    {name = "Executor", color = Color3.fromRGB(45,55,65)},
+    {name = "Credits", color = Color3.fromRGB(150,100,50)}
 }
 
 local tabButtons = {}
@@ -207,8 +585,8 @@ local contentFrames = {}
 
 for i, tab in ipairs(tabs) do
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.25, 0, 1, 0)
-    btn.Position = UDim2.new((i-1) * 0.25, 0, 0, 0)
+    btn.Size = UDim2.new(0.2, 0, 1, 0)
+    btn.Position = UDim2.new((i-1) * 0.2, 0, 0, 0)
     btn.BackgroundColor3 = tab.color
     btn.Text = tab.name
     btn.TextColor3 = Color3.new(1,1,1)
@@ -267,22 +645,16 @@ local function createButton(parent, text, callback, color)
 end
 
 -- ============ SCAN GAME FUNCTION ============
-local scanResults = {}
-local scanFrame = nil
-local scanText = nil
-
 local function scanGame()
-    notify("🔍 Scanning game... This may take a moment")
-    scanResults = {}
+    notify("🔍 Scanning game...")
     
-    -- Create scan results window
     local scanGui = Instance.new("ScreenGui")
     scanGui.Name = "ScanResults"
     scanGui.Parent = plr.PlayerGui
     
     local scanMainFrame = Instance.new("Frame")
-    scanMainFrame.Size = UDim2.new(0, 400, 0, 500)
-    scanMainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
+    scanMainFrame.Size = UDim2.new(0, 400, 0, 450)
+    scanMainFrame.Position = UDim2.new(0.5, -200, 0.5, -225)
     scanMainFrame.BackgroundColor3 = Color3.fromRGB(15,15,25)
     scanMainFrame.Parent = scanGui
     Instance.new("UICorner", scanMainFrame).CornerRadius = UDim.new(0, 12)
@@ -319,124 +691,65 @@ local function scanGame()
     local scanLayout = Instance.new("UIListLayout")
     scanLayout.Parent = scanContent
     scanLayout.Padding = UDim.new(0, 5)
-    scanLayout.SortOrder = Enum.SortOrder.LayoutOrder
     
-    local function addScanResult(category, name, value)
-        local resultFrame = Instance.new("Frame")
-        resultFrame.Size = UDim2.new(0.96, 0, 0, 40)
-        resultFrame.BackgroundColor3 = Color3.fromRGB(30,30,45)
-        resultFrame.Parent = scanContent
-        Instance.new("UICorner", resultFrame).CornerRadius = UDim.new(0, 8)
+    local function addResult(category, name, value)
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0.96, 0, 0, 35)
+        frame.BackgroundColor3 = Color3.fromRGB(30,30,45)
+        frame.Parent = scanContent
+        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
         
-        local catLabel = Instance.new("TextLabel")
-        catLabel.Size = UDim2.new(0.3, 0, 1, 0)
-        catLabel.Position = UDim2.new(0.02, 0, 0, 0)
-        catLabel.BackgroundTransparency = 1
-        catLabel.Text = category
-        catLabel.TextColor3 = Color3.fromRGB(100,200,255)
-        catLabel.TextScaled = true
-        catLabel.Font = Enum.Font.GothamBold
-        catLabel.Parent = resultFrame
+        local cat = Instance.new("TextLabel")
+        cat.Size = UDim2.new(0.3,0,1,0)
+        cat.Position = UDim2.new(0.02,0,0,0)
+        cat.BackgroundTransparency = 1
+        cat.Text = category
+        cat.TextColor3 = Color3.fromRGB(100,200,255)
+        cat.TextScaled = true
+        cat.Font = Enum.Font.GothamBold
+        cat.Parent = frame
         
         local nameLabel = Instance.new("TextLabel")
-        nameLabel.Size = UDim2.new(0.35, 0, 1, 0)
-        nameLabel.Position = UDim2.new(0.33, 0, 0, 0)
+        nameLabel.Size = UDim2.new(0.4,0,1,0)
+        nameLabel.Position = UDim2.new(0.33,0,0,0)
         nameLabel.BackgroundTransparency = 1
         nameLabel.Text = name
-        nameLabel.TextColor3 = Color3.fromRGB(255,255,100)
+        nameLabel.TextColor3 = Color3.fromRGB(255,255,150)
         nameLabel.TextScaled = true
         nameLabel.Font = Enum.Font.Gotham
-        nameLabel.Parent = resultFrame
+        nameLabel.Parent = frame
         
-        local valueLabel = Instance.new("TextLabel")
-        valueLabel.Size = UDim2.new(0.28, 0, 1, 0)
-        valueLabel.Position = UDim2.new(0.69, 0, 0, 0)
-        valueLabel.BackgroundTransparency = 1
-        valueLabel.Text = tostring(value)
-        valueLabel.TextColor3 = Color3.fromRGB(100,255,100)
-        valueLabel.TextScaled = true
-        valueLabel.Font = Enum.Font.Gotham
-        valueLabel.Parent = resultFrame
+        local val = Instance.new("TextLabel")
+        val.Size = UDim2.new(0.23,0,1,0)
+        val.Position = UDim2.new(0.74,0,0,0)
+        val.BackgroundTransparency = 1
+        val.Text = tostring(value)
+        val.TextColor3 = Color3.fromRGB(100,255,100)
+        val.TextScaled = true
+        val.Font = Enum.Font.Gotham
+        val.Parent = frame
     end
     
-    -- Scan Workspace
-    local workspaceCount = 0
-    for _, child in pairs(Workspace:GetChildren()) do
-        workspaceCount = workspaceCount + 1
-    end
-    addScanResult("📦 Workspace", "Total Objects", workspaceCount)
+    addResult("📦 Workspace", "Objects", #Workspace:GetChildren())
+    addResult("👥 Players", "Online", #Players:GetPlayers())
+    addResult("📡 ReplicatedStorage", "Total Items", #ReplicatedStorage:GetChildren())
+    addResult("💡 Lighting", "Brightness", math.floor(Lighting.Brightness))
+    addResult("💡 Lighting", "ClockTime", math.floor(Lighting.ClockTime))
     
-    -- Scan Players
-    addScanResult("👥 Players", "Total Players", #Players:GetPlayers())
-    local playerNames = ""
-    for i, p in pairs(Players:GetPlayers()) do
-        if i <= 5 then
-            playerNames = playerNames .. p.Name .. (i < #Players:GetPlayers() and i < 5 and ", " or "")
-        end
-    end
-    if #Players:GetPlayers() > 5 then
-        playerNames = playerNames .. " +" .. (#Players:GetPlayers() - 5) .. " more"
-    end
-    addScanResult("👥 Players", "Names", playerNames)
-    
-    -- Scan ReplicatedStorage
     local remoteEvents = 0
     local remoteFunctions = 0
-    local scripts = 0
     for _, child in pairs(ReplicatedStorage:GetChildren()) do
-        if child:IsA("RemoteEvent") then remoteEvents = remoteEvents + 1
-        elseif child:IsA("RemoteFunction") then remoteFunctions = remoteFunctions + 1
-        elseif child:IsA("Script") or child:IsA("LocalScript") or child:IsA("ModuleScript") then scripts = scripts + 1
-        end
+        if child:IsA("RemoteEvent") then remoteEvents = remoteEvents + 1 end
+        if child:IsA("RemoteFunction") then remoteFunctions = remoteFunctions + 1 end
     end
-    addScanResult("📡 ReplicatedStorage", "RemoteEvents", remoteEvents)
-    addScanResult("📡 ReplicatedStorage", "RemoteFunctions", remoteFunctions)
-    addScanResult("📡 ReplicatedStorage", "Scripts/Modules", scripts)
+    addResult("📡 Remotes", "RemoteEvents", remoteEvents)
+    addResult("📡 Remotes", "RemoteFunctions", remoteFunctions)
     
-    -- Scan Lighting
-    addScanResult("💡 Lighting", "ClockTime", math.floor(Lighting.ClockTime))
-    addScanResult("💡 Lighting", "Brightness", math.floor(Lighting.Brightness))
-    addScanResult("💡 Lighting", "FogEnd", math.floor(Lighting.FogEnd))
-    
-    -- Detect backdoor indicators
-    local backdoorIndicators = {}
-    local backdoorIDs = {7192763922, 7116428237, 5813836873, 5282751219, 4867426485, 7001260635, 15581949972, 9230060018, 7411835387, 8222129769, 11505758587, 16857604287, 114451231828363}
-    for _, id in pairs(backdoorIDs) do
-        local success = pcall(function() return require(id) end)
-        if success then
-            table.insert(backdoorIndicators, tostring(id))
-        end
-    end
-    addScanResult("🔓 Backdoor Check", "Require IDs Found", #backdoorIndicators)
-    if #backdoorIndicators > 0 then
-        addScanResult("🔓 Backdoor IDs", "IDs", table.concat(backdoorIndicators, ", "))
-    end
-    
-    -- Scan for admin scripts
-    local adminIndicators = {"Admin", "ESP", "Fly", "Noclip", "Infinite", "Yield", "CMD", "Command"}
-    local foundAdmin = {}
-    local services = {Workspace, ReplicatedStorage, Lighting}
-    for _, service in pairs(services) do
-        for _, child in pairs(service:GetChildren()) do
-            for _, indicator in pairs(adminIndicators) do
-                if child.Name:find(indicator) then
-                    table.insert(foundAdmin, child.Name)
-                    break
-                end
-            end
-        end
-    end
-    addScanResult("🛡️ Admin Scripts", "Found", #foundAdmin)
-    if #foundAdmin > 0 then
-        addScanResult("🛡️ Admin Scripts", "Names", table.concat(foundAdmin, ", "))
-    end
-    
-    -- Update canvas size
     task.wait(0.1)
     local totalHeight = 0
     for _, child in pairs(scanContent:GetChildren()) do
         if child:IsA("Frame") then
-            totalHeight = totalHeight + 45
+            totalHeight = totalHeight + 40
         end
     end
     scanContent.CanvasSize = UDim2.new(0, 0, 0, totalHeight + 20)
@@ -445,7 +758,7 @@ local function scanGame()
         scanGui:Destroy()
     end)
     
-    notify("✅ Scan complete! Found " .. (#Players:GetPlayers()) .. " players, " .. remoteEvents .. " RemoteEvents, " .. #backdoorIndicators .. " backdoor IDs")
+    notify("✅ Scan complete!")
 end
 
 -- ============ FLY ============
@@ -700,7 +1013,7 @@ local clientScripts = {
     {"🌌 Custom Skybox", "local s = Instance.new('Sky'); s.Parent = game.Lighting; s.SkyboxBk = 'rbxassetid://133260261393194'; s.SkyboxDn = 'rbxassetid://133260261393194'; s.SkyboxFt = 'rbxassetid://133260261393194'; s.SkyboxLf = 'rbxassetid://133260261393194'; s.SkyboxRt = 'rbxassetid://133260261393194'; s.SkyboxUp = 'rbxassetid://133260261393194'"}
 }
 
--- ============ SS SCRIPTS (ServerSide - Attempts) ============
+-- ============ SS SCRIPTS ============
 local ssScripts = {
     {"🌊 Attempt Flood", [[
         for x = -200, 200, 50 do
@@ -773,7 +1086,7 @@ local ssScripts = {
     ]]},
 }
 
--- ============ SCRIPT EXECUTOR ============
+-- ============ CREATE EXECUTOR ============
 local function createExecutor(parent)
     local execFrame = Instance.new("Frame")
     if isMobile then
@@ -850,27 +1163,174 @@ local function createExecutor(parent)
         end
     end)
     
-    if isMobile then
-        execBtn.TouchTap:Connect(function()
-            local code = scriptBox.Text
-            if code and code ~= "" then
-                local success, err = pcall(function()
-                    loadstring(code)()
-                end)
-                if success then
-                    notify("✅ Script executed!")
-                else
-                    notify("❌ Error: " .. tostring(err))
-                end
-            end
-        end)
-    end
-    
     clearBtn.MouseButton1Click:Connect(function()
         scriptBox.Text = ""
         notify("Cleared!")
     end)
 end
+
+-- ============ CREDITS TAB ============
+local creditsContent = contentFrames["Credits"]
+
+-- Title
+local creditsTitle = Instance.new("TextLabel")
+creditsTitle.Size = UDim2.new(0.94, 0, 0, 40)
+creditsTitle.BackgroundColor3 = Color3.fromRGB(150,100,50)
+creditsTitle.BackgroundTransparency = 0.2
+creditsTitle.Text = "🎉 MAKERCS CREDITS 🎉"
+creditsTitle.TextColor3 = Color3.fromRGB(255,215,0)
+creditsTitle.TextScaled = true
+creditsTitle.Font = Enum.Font.GothamBold
+creditsTitle.Parent = creditsContent
+Instance.new("UICorner", creditsTitle).CornerRadius = UDim.new(0, 10)
+
+-- Creator
+local creatorFrame = Instance.new("Frame")
+creatorFrame.Size = UDim2.new(0.94, 0, 0, 70)
+creatorFrame.BackgroundColor3 = Color3.fromRGB(30,30,50)
+creatorFrame.Parent = creditsContent
+Instance.new("UICorner", creatorFrame).CornerRadius = UDim.new(0, 10)
+
+local creatorIcon = Instance.new("TextLabel")
+creatorIcon.Size = UDim2.new(0, 50, 1, 0)
+creatorIcon.BackgroundTransparency = 1
+creatorIcon.Text = "👑"
+creatorIcon.TextColor3 = Color3.fromRGB(255,215,0)
+creatorIcon.TextScaled = true
+creatorIcon.Font = Enum.Font.GothamBold
+creatorIcon.Parent = creatorFrame
+
+local creatorText = Instance.new("TextLabel")
+creatorText.Size = UDim2.new(1, -60, 1, 0)
+creatorText.Position = UDim2.new(0, 60, 0, 0)
+creatorText.BackgroundTransparency = 1
+creatorText.Text = "CREATOR & DEVELOPER\nThatOneScripter1234"
+creatorText.TextColor3 = Color3.new(1,1,1)
+creatorText.TextScaled = true
+creatorText.TextXAlignment = Enum.TextXAlignment.Left
+creatorText.Font = Enum.Font.GothamBold
+creatorText.Parent = creatorFrame
+
+-- Version
+local versionFrame = Instance.new("Frame")
+versionFrame.Size = UDim2.new(0.94, 0, 0, 50)
+versionFrame.BackgroundColor3 = Color3.fromRGB(30,30,50)
+versionFrame.Parent = creditsContent
+Instance.new("UICorner", versionFrame).CornerRadius = UDim.new(0, 10)
+
+local versionText = Instance.new("TextLabel")
+versionText.Size = UDim2.new(1,0,1,0)
+versionText.BackgroundTransparency = 1
+versionText.Text = "📌 VERSION: 3.0.0"
+versionText.TextColor3 = Color3.fromRGB(100,200,255)
+versionText.TextScaled = true
+versionText.Font = Enum.Font.GothamBold
+versionText.Parent = versionFrame
+
+-- Features List
+local featuresFrame = Instance.new("Frame")
+featuresFrame.Size = UDim2.new(0.94, 0, 0, 120)
+featuresFrame.BackgroundColor3 = Color3.fromRGB(30,30,50)
+featuresFrame.Parent = creditsContent
+Instance.new("UICorner", featuresFrame).CornerRadius = UDim.new(0, 10)
+
+local featuresTitle = Instance.new("TextLabel")
+featuresTitle.Size = UDim2.new(1,0,0,25)
+featuresTitle.BackgroundColor3 = Color3.fromRGB(100,50,150)
+featuresTitle.Text = "⚡ FEATURES"
+featuresTitle.TextColor3 = Color3.new(1,1,1)
+featuresTitle.TextScaled = true
+featuresTitle.Font = Enum.Font.GothamBold
+featuresTitle.Parent = featuresFrame
+Instance.new("UICorner", featuresTitle).CornerRadius = UDim.new(0, 8)
+
+local featuresList = Instance.new("TextLabel")
+featuresList.Size = UDim2.new(1, -10, 1, -30)
+featuresList.Position = UDim2.new(0, 5, 0, 30)
+featuresList.BackgroundTransparency = 1
+featuresList.Text = "• Fly Hack\n• Noclip\n• ESP (See players)\n• Invisibility\n• Disco Mode\n• Speed Hack (100)\n• Jump Hack (200)\n• Client Script Executor\n• ServerSide Scripts\n• AI Assistant (GPT API)\n• Game Scanner\n• Custom Skybox"
+featuresList.TextColor3 = Color3.fromRGB(200,200,200)
+featuresList.TextScaled = true
+featuresList.TextXAlignment = Enum.TextXAlignment.Left
+featuresList.TextYAlignment = Enum.TextYAlignment.Top
+featuresList.Font = Enum.Font.Gotham
+featuresList.Parent = featuresFrame
+
+-- Special Thanks
+local thanksFrame = Instance.new("Frame")
+thanksFrame.Size = UDim2.new(0.94, 0, 0, 80)
+thanksFrame.BackgroundColor3 = Color3.fromRGB(30,30,50)
+thanksFrame.Parent = creditsContent
+Instance.new("UICorner", thanksFrame).CornerRadius = UDim.new(0, 10)
+
+local thanksTitle = Instance.new("TextLabel")
+thanksTitle.Size = UDim2.new(1,0,0,25)
+thanksTitle.BackgroundColor3 = Color3.fromRGB(100,50,150)
+thanksTitle.Text = "🙏 SPECIAL THANKS"
+thanksTitle.TextColor3 = Color3.new(1,1,1)
+thanksTitle.TextScaled = true
+thanksTitle.Font = Enum.Font.GothamBold
+thanksTitle.Parent = thanksFrame
+Instance.new("UICorner", thanksTitle).CornerRadius = UDim.new(0, 8)
+
+local thanksList = Instance.new("TextLabel")
+thanksList.Size = UDim2.new(1, -10, 1, -30)
+thanksList.Position = UDim2.new(0, 5, 0, 30)
+thanksList.BackgroundTransparency = 1
+thanksList.Text = "• Roblox Community\n• Open Source Contributors\n• Beta Testers"
+thanksList.TextColor3 = Color3.fromRGB(200,200,200)
+thanksList.TextScaled = true
+thanksList.TextXAlignment = Enum.TextXAlignment.Left
+thanksList.TextYAlignment = Enum.TextYAlignment.Top
+thanksList.Font = Enum.Font.Gotham
+thanksList.Parent = thanksFrame
+
+-- Links
+local linksFrame = Instance.new("Frame")
+linksFrame.Size = UDim2.new(0.94, 0, 0, 60)
+linksFrame.BackgroundColor3 = Color3.fromRGB(30,30,50)
+linksFrame.Parent = creditsContent
+Instance.new("UICorner", linksFrame).CornerRadius = UDim.new(0, 10)
+
+local linksTitle = Instance.new("TextLabel")
+linksTitle.Size = UDim2.new(1,0,0,25)
+linksTitle.BackgroundColor3 = Color3.fromRGB(100,50,150)
+linksTitle.Text = "🔗 LINKS"
+linksTitle.TextColor3 = Color3.new(1,1,1)
+linksTitle.TextScaled = true
+linksTitle.Font = Enum.Font.GothamBold
+linksTitle.Parent = linksFrame
+Instance.new("UICorner", linksTitle).CornerRadius = UDim.new(0, 8)
+
+local linksText = Instance.new("TextLabel")
+linksText.Size = UDim2.new(1, -10, 1, -30)
+linksText.Position = UDim2.new(0, 5, 0, 30)
+linksText.BackgroundTransparency = 1
+linksText.Text = "GitHub: github.com/ypw96hmxqy-cmd/MakerCS"
+linksText.TextColor3 = Color3.fromRGB(100,200,255)
+linksText.TextScaled = true
+linksText.TextXAlignment = Enum.TextXAlignment.Left
+linksText.TextYAlignment = Enum.TextYAlignment.Top
+linksText.Font = Enum.Font.Gotham
+linksText.Parent = linksFrame
+
+-- Disclaimer
+local disclaimerFrame = Instance.new("Frame")
+disclaimerFrame.Size = UDim2.new(0.94, 0, 0, 60)
+disclaimerFrame.BackgroundColor3 = Color3.fromRGB(50,30,30)
+disclaimerFrame.Parent = creditsContent
+Instance.new("UICorner", disclaimerFrame).CornerRadius = UDim.new(0, 10)
+
+local disclaimerText = Instance.new("TextLabel")
+disclaimerText.Size = UDim2.new(1, -10, 1, -10)
+disclaimerText.Position = UDim2.new(0, 5, 0, 5)
+disclaimerText.BackgroundTransparency = 1
+disclaimerText.Text = "⚠️ DISCLAIMER: This script is for educational purposes only. Use at your own risk."
+disclaimerText.TextColor3 = Color3.fromRGB(255,100,100)
+disclaimerText.TextScaled = true
+disclaimerText.TextWrapped = true
+disclaimerText.Font = Enum.Font.Gotham
+disclaimerText.Parent = disclaimerFrame
 
 -- ============ POPULATE TABS ============
 
@@ -886,9 +1346,7 @@ createButton(mainContent, "🦘 Toggle Jump (200)", toggleJump, Color3.fromRGB(6
 
 -- CLIENT SCRIPTS TAB
 local clientContent = contentFrames["Client Scripts"]
-
--- Add Scan Game button
-createButton(clientContent, "🔍 SCAN GAME (Full Scan)", scanGame, Color3.fromRGB(0,100,150))
+createButton(clientContent, "🔍 SCAN GAME", scanGame, Color3.fromRGB(0,100,150))
 
 for _, script in pairs(clientScripts) do
     createButton(clientContent, script[1], function()
@@ -934,30 +1392,6 @@ end
 local execContent = contentFrames["Executor"]
 createExecutor(execContent)
 
--- Update canvas sizes
-local function updateAllCanvas()
-    task.wait(0.1)
-    for name, content in pairs(contentFrames) do
-        local count = 0
-        for _, child in pairs(content:GetChildren()) do
-            if child:IsA("TextButton") or child:IsA("Frame") then
-                count = count + 1
-            end
-        end
-        content.CanvasSize = UDim2.new(0, 0, 0, (count * 55) + 30)
-    end
-end
-updateAllCanvas()
-
-for _, content in pairs(contentFrames) do
-    local layout = content:FindFirstChildWhichIsA("UIListLayout")
-    if layout then
-        layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            content.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
-        end)
-    end
-end
-
 -- Tab switching
 for name, btn in pairs(tabButtons) do
     btn.MouseButton1Click:Connect(function()
@@ -1000,23 +1434,28 @@ icon.MouseButton1Click:Connect(function()
     icon.Visible = false
 end)
 
-if isMobile then
-    icon.TouchTap:Connect(function()
-        mainFrame.Visible = true
-        icon.Visible = false
-    end)
-end
+-- Create AI Chat
+local aiChat = createAIChat()
+
+-- AI Button click
+aiButton.MouseButton1Click:Connect(function()
+    if aiChat then
+        aiChat.Visible = not aiChat.Visible
+    end
+end)
 
 -- Final welcome
-notify("✅ MakerCS Loaded!")
+notify("✅ MakerCS Loaded with AI!")
 notify("Executor: " .. executor)
 notify("Game: " .. game.Name)
-notify(isMobile and "📱 Mobile Mode Active" or "💻 PC Mode Active")
+notify("🤖 Click the AI button for help!")
 
 print("========================================")
-print("MakerCS - Complete Script")
+print("MakerCS - Complete Script with AI API")
 print("Executor: " .. executor)
 print("Game: " .. game.Name .. " (ID: " .. placeId .. ")")
 print("Mobile: " .. tostring(isMobile))
-print("Tabs: Main, Client Scripts, SS Scripts, Executor")
+print("AI Features: Multiple API support + local fallback")
+print("Tabs: Main, Client Scripts, SS Scripts, Executor, Credits")
+print("GitHub: github.com/ypw96hmxqy-cmd/MakerCS")
 print("========================================")
