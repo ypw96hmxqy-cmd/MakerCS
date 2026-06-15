@@ -1,4 +1,4 @@
--- MakerCS - GitHub Loadstring Version (Mobile Friendly)
+-- MakerCS - Working Toggle Edition for Delta
 -- Loadstring: loadstring(game:HttpGet("https://raw.githubusercontent.com/ypw96hmxqy-cmd/MakerCS/main/script.lua"))()
 
 repeat task.wait() until game:IsLoaded()
@@ -15,20 +15,28 @@ local char = plr.Character or plr.CharacterAdded:Wait()
 local hum = char:WaitForChild("Humanoid")
 local root = char:WaitForChild("HumanoidRootPart")
 
--- Variables
-local flying = false
-local noclipping = false
-local espOn = false
-local invisible = false
-local discoOn = false
-local flySpeed = 50
-local cons = {}
-local esps = {}
+-- Toggle states (using simple boolean variables)
+local flyEnabled = false
+local noclipEnabled = false
+local espEnabled = false
+local invisibleEnabled = false
+local discoEnabled = false
+local speedEnabled = false
+local jumpEnabled = false
+local ragdollEnabled = false
+
+local flyBV = nil
+local flyBG = nil
+local espList = {}
+local discoConnection = nil
+local originalSpeed = 16
+local originalJump = 50
+local ragdollParts = {}
 
 -- Mobile detection
 local isMobile = UIS.TouchEnabled
 
--- Check for Murder Mystery 2
+-- MM2 detection
 local isMM2 = (game.PlaceId == 142823291) or (game.Name and string.find(game.Name, "Murder Mystery"))
 
 -- Notification
@@ -36,60 +44,46 @@ local function notify(msg)
     pcall(function()
         SG:SetCore("SendNotification", {Title = "MakerCS", Text = msg, Duration = 2})
     end)
-    print("[MakerCS] " .. msg)
 end
 
--- Character respawn handler
-plr.CharacterAdded:Connect(function(newChar)
-    char = newChar
-    hum = char:WaitForChild("Humanoid")
-    root = char:WaitForChild("HumanoidRootPart")
-    task.wait(0.5)
-    
-    if noclipping then
-        for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                pcall(function() part.CanCollide = false end)
-            end
-        end
-    end
-    
-    if invisible then
-        for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") or part:IsA("MeshPart") then
-                pcall(function() part.Transparency = 1 end)
-            end
-        end
-    end
-end)
-
--- ============ MOBILE-FRIENDLY FLY ============
+-- ============ FLY TOGGLE ============
 local function toggleFly()
     if not root then notify("Wait for character!"); return end
-    flying = not flying
     
-    if flying then
-        local bv = Instance.new("BodyVelocity")
-        local bg = Instance.new("BodyGyro")
-        bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-        bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-        bv.Parent = root
-        bg.Parent = root
+    if flyEnabled then
+        -- Turn OFF
+        flyEnabled = false
+        if flyBV then flyBV:Destroy() end
+        if flyBG then flyBG:Destroy() end
+        flyBV = nil
+        flyBG = nil
+        notify("✈️ Fly OFF")
+    else
+        -- Turn ON
+        flyEnabled = true
+        flyBV = Instance.new("BodyVelocity")
+        flyBG = Instance.new("BodyGyro")
+        flyBV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+        flyBG.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+        flyBV.Parent = root
+        flyBG.Parent = root
         
-        local con = RS.RenderStepped:Connect(function()
-            if not flying or not root then return end
+        -- Create movement connection
+        local con
+        con = RS.RenderStepped:Connect(function()
+            if not flyEnabled or not root then 
+                if con then con:Disconnect() end
+                return 
+            end
             local cam = workspace.CurrentCamera
             local dir = Vector3.new()
             
             if isMobile then
-                -- Mobile: Use MoveDirection from joystick
                 local moveVec = hum.MoveDirection
                 if moveVec.Magnitude > 0.1 then
-                    -- Convert joystick to camera-relative movement
                     dir = (cam.CFrame.RightVector * moveVec.X) + (cam.CFrame.LookVector * -moveVec.Z)
                     dir = dir.Unit
                 end
-                -- Vertical movement on mobile (jump/crouch buttons)
                 if UIS:IsKeyDown(Enum.KeyCode.Space) or UIS:IsKeyDown(Enum.KeyCode.ButtonA) then
                     dir = dir + Vector3.new(0, 1, 0)
                 end
@@ -97,7 +91,6 @@ local function toggleFly()
                     dir = dir + Vector3.new(0, -1, 0)
                 end
             else
-                -- PC: Use WASD
                 if UIS:IsKeyDown(Enum.KeyCode.W) then dir = dir + cam.CFrame.LookVector end
                 if UIS:IsKeyDown(Enum.KeyCode.S) then dir = dir - cam.CFrame.LookVector end
                 if UIS:IsKeyDown(Enum.KeyCode.A) then dir = dir - cam.CFrame.RightVector end
@@ -107,35 +100,31 @@ local function toggleFly()
             end
             
             if dir.Magnitude > 0 then
-                bv.Velocity = dir.Unit * flySpeed
+                flyBV.Velocity = dir.Unit * 50
             else
-                bv.Velocity = Vector3.new()
+                flyBV.Velocity = Vector3.new()
             end
-            bg.CFrame = cam.CFrame
+            flyBG.CFrame = cam.CFrame
         end)
-        table.insert(cons, con)
         
-        if isMobile then
-            notify("✈️ Fly ON - Use joystick to move! Jump = Up, Crouch = Down")
-        else
-            notify("✈️ Fly ON - WASD + Space/Ctrl")
-        end
-    else
-        for _, v in pairs(root:GetChildren()) do
-            if v:IsA("BodyVelocity") or v:IsA("BodyGyro") then v:Destroy() end
-        end
-        notify("✈️ Fly OFF")
+        notify("✈️ Fly ON - " .. (isMobile and "Use joystick! Jump/Crouch = Up/Down" or "WASD + Space/Ctrl"))
     end
 end
 
--- ============ NOCLIP ============
+-- ============ NOCLIP TOGGLE ============
 local function toggleNoclip()
-    noclipping = not noclipping
-    notify(noclipping and "🚪 Noclip ON" or "🚪 Noclip OFF")
+    if noclipEnabled then
+        noclipEnabled = false
+        notify("🚪 Noclip OFF")
+    else
+        noclipEnabled = true
+        notify("🚪 Noclip ON")
+    end
 end
 
-local noclipCon = RS.Stepped:Connect(function()
-    if noclipping and char then
+-- Noclip loop
+local noclipLoop = RS.Stepped:Connect(function()
+    if noclipEnabled and char then
         for _, part in pairs(char:GetDescendants()) do
             if part:IsA("BasePart") then
                 pcall(function() part.CanCollide = false end)
@@ -143,16 +132,19 @@ local noclipCon = RS.Stepped:Connect(function()
         end
     end
 end)
-table.insert(cons, noclipCon)
 
--- ============ ESP ============
+-- ============ ESP TOGGLE ============
 local function updateESP()
-    if not espOn then return end
+    if not espEnabled then return end
+    
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= plr and p.Character and p.Character:FindFirstChild("Head") then
             local exists = false
-            for _, bg in pairs(esps) do
-                if bg.Adornee == p.Character.Head then exists = true; break end
+            for _, esp in pairs(espList) do
+                if esp.Adornee == p.Character.Head then
+                    exists = true
+                    break
+                end
             end
             if not exists then
                 local bg = Instance.new("BillboardGui")
@@ -162,180 +154,259 @@ local function updateESP()
                 bg.Parent = gui
                 
                 local tl = Instance.new("TextLabel")
-                tl.Size = UDim2.new(1, 0, 0.5, 0)
+                tl.Size = UDim2.new(1, 0, 1, 0)
                 tl.BackgroundTransparency = 1
-                
-                -- MM2 Role Detection
-                if isMM2 and p.Character then
-                    if p.Character:FindFirstChild("Knife") then
-                        tl.Text = "🔪 " .. p.Name .. " - MURDERER"
-                        tl.TextColor3 = Color3.fromRGB(255, 50, 50)
-                    elseif p.Character:FindFirstChild("Gun") then
-                        tl.Text = "🔫 " .. p.Name .. " - SHERIFF"
-                        tl.TextColor3 = Color3.fromRGB(50, 150, 255)
-                    else
-                        tl.Text = "👤 " .. p.Name
-                        tl.TextColor3 = Color3.fromRGB(100, 255, 100)
-                    end
-                else
-                    tl.Text = p.Name
-                    tl.TextColor3 = Color3.fromRGB(255, 50, 50)
-                end
-                
+                tl.Text = p.Name
+                tl.TextColor3 = Color3.fromRGB(255, 0, 0)
                 tl.TextScaled = true
                 tl.Font = Enum.Font.GothamBold
                 tl.Parent = bg
-                table.insert(esps, bg)
+                
+                table.insert(espList, bg)
             end
         end
     end
 end
 
 local function toggleESP()
-    espOn = not espOn
-    if espOn then
+    if espEnabled then
+        espEnabled = false
+        for _, v in pairs(espList) do
+            pcall(function() v:Destroy() end)
+        end
+        espList = {}
+        notify("👁️ ESP OFF")
+    else
+        espEnabled = true
         updateESP()
-        Players.PlayerAdded:Connect(function() task.wait(0.5) updateESP() end)
+        
+        -- Watch for new players
+        Players.PlayerAdded:Connect(function()
+            task.wait(0.5)
+            if espEnabled then updateESP() end
+        end)
+        
+        -- Watch for character spawns
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= plr then
-                p.CharacterAdded:Connect(function() task.wait(0.5) updateESP() end)
+                p.CharacterAdded:Connect(function()
+                    task.wait(0.5)
+                    if espEnabled then updateESP() end
+                end)
             end
         end
-        notify(isMM2 and "👁️ MM2 ESP ON - Shows roles!" or "👁️ ESP ON")
-    else
-        for _, v in pairs(esps) do pcall(function() v:Destroy() end) end
-        esps = {}
-        notify("👁️ ESP OFF")
+        
+        notify("👁️ ESP ON")
     end
 end
 
--- ============ INVISIBLE ============
+-- ============ INVISIBLE TOGGLE ============
 local function toggleInvisible()
     if not char then notify("Wait for character!"); return end
-    invisible = not invisible
-    if invisible then
-        for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") or part:IsA("MeshPart") then
-                pcall(function() part.Transparency = 1 end)
-            end
-        end
-        notify("👻 Invisible ON")
-    else
+    
+    if invisibleEnabled then
+        invisibleEnabled = false
         for _, part in pairs(char:GetDescendants()) do
             if part:IsA("BasePart") or part:IsA("MeshPart") then
                 pcall(function() part.Transparency = 0 end)
             end
         end
         notify("👻 Invisible OFF")
+    else
+        invisibleEnabled = true
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("MeshPart") then
+                pcall(function() part.Transparency = 1 end)
+            end
+        end
+        notify("👻 Invisible ON")
     end
 end
 
--- ============ DISCO ============
-local discoCon = nil
+-- ============ DISCO TOGGLE ============
 local function toggleDisco()
-    discoOn = not discoOn
-    if discoOn then
-        discoCon = RS.Heartbeat:Connect(function()
-            if discoOn then Lighting.Ambient = Color3.fromHSV(tick() % 5 / 5, 1, 1) end
-        end)
-        notify("🕺 Disco ON")
-    else
-        if discoCon then discoCon:Disconnect() end
+    if discoEnabled then
+        discoEnabled = false
+        if discoConnection then discoConnection:Disconnect() end
         Lighting.Ambient = Color3.fromRGB(127, 127, 127)
         notify("🕺 Disco OFF")
+    else
+        discoEnabled = true
+        discoConnection = RS.Heartbeat:Connect(function()
+            if discoEnabled then
+                Lighting.Ambient = Color3.fromHSV(tick() % 5 / 5, 1, 1)
+            end
+        end)
+        notify("🕺 Disco ON")
     end
 end
 
--- ============ SPEED ============
-local speedActive = false
-local originalSpeed = 16
+-- ============ SPEED TOGGLE ============
 local function toggleSpeed()
     if not hum then notify("Wait for character!"); return end
-    speedActive = not speedActive
-    if speedActive then
+    
+    if speedEnabled then
+        speedEnabled = false
+        hum.WalkSpeed = originalSpeed
+        notify("⚡ Speed OFF")
+    else
+        speedEnabled = true
         originalSpeed = hum.WalkSpeed
         hum.WalkSpeed = 100
         notify("⚡ Speed 100 ON")
-    else
-        hum.WalkSpeed = originalSpeed
-        notify("⚡ Speed OFF")
     end
 end
 
--- ============ JUMP ============
-local jumpActive = false
-local originalJump = 50
+-- ============ JUMP TOGGLE ============
 local function toggleJump()
     if not hum then notify("Wait for character!"); return end
-    jumpActive = not jumpActive
-    if jumpActive then
+    
+    if jumpEnabled then
+        jumpEnabled = false
+        hum.JumpPower = originalJump
+        notify("🦘 Jump OFF")
+    else
+        jumpEnabled = true
         originalJump = hum.JumpPower
         hum.JumpPower = 200
         notify("🦘 Jump 200 ON")
-    else
-        hum.JumpPower = originalJump
-        notify("🦘 Jump OFF")
     end
 end
 
--- ============ RAGDOLL ============
-local ragdollActive = false
+-- ============ RAGDOLL TOGGLE ============
 local function toggleRagdoll()
-    if not char then notify("Wait for character!"); return end
-    ragdollActive = not ragdollActive
+    if not char or not hum then notify("Wait for character!"); return end
     
-    if ragdollActive then
+    if ragdollEnabled then
+        ragdollEnabled = false
+        
+        -- Restore humanoid
+        hum.AutoRotate = true
+        hum.PlatformStand = false
+        hum.WalkSpeed = 16
+        hum.JumpPower = 50
+        
+        -- Clean up
+        for _, v in pairs(ragdollParts) do
+            pcall(function() v:Destroy() end)
+        end
+        ragdollParts = {}
+        
+        -- Reset parts
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+                part.Velocity = Vector3.new()
+            end
+        end
+        
+        notify("💀 Ragdoll OFF")
+    else
+        ragdollEnabled = true
+        
+        -- Disable humanoid
         hum.AutoRotate = false
         hum.PlatformStand = true
+        hum.WalkSpeed = 0
+        hum.JumpPower = 0
         
-        local parts = {"Head", "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg"}
+        -- Ragdoll parts
+        local parts = {"Head", "Torso", "UpperTorso", "LowerTorso", "LeftArm", "RightArm", "LeftLeg", "RightLeg"}
+        
         for _, partName in pairs(parts) do
             local part = char:FindFirstChild(partName)
-            if part then
+            if part and part:IsA("BasePart") then
+                -- Break joints
                 local weld = part:FindFirstChild("Weld")
                 local motor = part:FindFirstChild("Motor6D")
                 if weld then weld:Destroy() end
                 if motor then motor:Destroy() end
                 
+                -- Add physics
                 local bv = Instance.new("BodyVelocity")
-                bv.Velocity = Vector3.new(math.random(-10,10), math.random(-15,-5), math.random(-10,10))
-                bv.MaxForce = Vector3.new(1000,1000,1000)
+                bv.Velocity = Vector3.new(math.random(-15,15), math.random(-25,-10), math.random(-15,15))
+                bv.MaxForce = Vector3.new(4000, 4000, 4000)
                 bv.Parent = part
+                table.insert(ragdollParts, bv)
                 
-                task.wait(0.05)
+                local av = Instance.new("AngularVelocity")
+                av.AngularVelocity = Vector3.new(math.random(-10,10), math.random(-10,10), math.random(-10,10))
+                av.MaxTorque = Vector3.new(4000, 4000, 4000)
+                av.Parent = part
+                table.insert(ragdollParts, av)
+                
+                part.CanCollide = true
             end
         end
+        
         notify("💀 Ragdoll ON")
-    else
-        hum.AutoRotate = true
-        hum.PlatformStand = false
-        for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BodyVelocity") then part:Destroy() end
-        end
-        notify("💀 Ragdoll OFF")
     end
 end
 
 -- ============ LOADERS ============
 local function loadIY()
-    notify("📦 Loading Infinite Yield...")
+    notify("Loading Infinite Yield...")
     pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))() end)
 end
 
 local function loadPastefy()
-    notify("📋 Loading Pastefy...")
+    notify("Loading Pastefy...")
     pcall(function() loadstring(game:HttpGet("https://pastefy.app/iPp0a0Nx/raw"))() end)
 end
 
 local function loadEmotes()
-    notify("🎭 Loading Emotes...")
+    notify("Loading Emotes...")
     pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/7yd7/Hub/refs/heads/Branch/GUIS/Emotes.lua"))() end)
 end
 
 local function loadVertex()
-    notify("⚔️ Loading Vertex MM2...")
+    notify("Loading Vertex MM2...")
     pcall(function() loadstring(game:HttpGet("https://raw.smokingscripts.org/vertex.lua"))() end)
 end
+
+-- ============ CHARACTER RESPAWN ============
+plr.CharacterAdded:Connect(function(newChar)
+    char = newChar
+    hum = char:WaitForChild("Humanoid")
+    root = char:WaitForChild("HumanoidRootPart")
+    task.wait(0.5)
+    
+    -- Reapply toggles that should persist
+    if noclipEnabled then
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                pcall(function() part.CanCollide = false end)
+            end
+        end
+    end
+    
+    if invisibleEnabled then
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("MeshPart") then
+                pcall(function() part.Transparency = 1 end)
+            end
+        end
+    end
+    
+    if flyEnabled then
+        if flyBV then flyBV:Destroy() end
+        if flyBG then flyBG:Destroy() end
+        flyBV = Instance.new("BodyVelocity")
+        flyBG = Instance.new("BodyGyro")
+        flyBV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+        flyBG.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+        flyBV.Parent = root
+        flyBG.Parent = root
+    end
+    
+    if speedEnabled then
+        hum.WalkSpeed = 100
+    end
+    
+    if jumpEnabled then
+        hum.JumpPower = 200
+    end
+end)
 
 -- ============ CREATE GUI ============
 local gui = Instance.new("ScreenGui")
@@ -343,13 +414,9 @@ gui.Name = "MakerCS"
 gui.ResetOnSpawn = false
 gui.Parent = plr:WaitForChild("PlayerGui")
 
--- Mobile-optimized frame size
-local frameSize = isMobile and 320 or 280
-local frameHeight = isMobile and 550 or 520
-
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, frameSize, 0, frameHeight)
-mainFrame.Position = UDim2.new(0.5, -frameSize/2, 0.5, -frameHeight/2)
+mainFrame.Size = UDim2.new(0, 280, 0, 520)
+mainFrame.Position = UDim2.new(0.5, -140, 0.5, -260)
 mainFrame.BackgroundColor3 = Color3.fromRGB(20,20,30)
 mainFrame.Active = true
 mainFrame.Draggable = true
@@ -359,7 +426,7 @@ Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1,0,0,40)
 title.BackgroundColor3 = Color3.fromRGB(0,120,200)
-title.Text = "MakerCS" .. (isMM2 and " [MM2]" or "")
+title.Text = "MakerCS"
 title.TextColor3 = Color3.new(1,1,1)
 title.TextScaled = true
 title.Font = Enum.Font.GothamBold
@@ -376,33 +443,12 @@ minBtn.TextScaled = true
 minBtn.Parent = title
 Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 8)
 
--- Device info label
-local deviceLabel = Instance.new("TextLabel")
-deviceLabel.Size = UDim2.new(1,0,0,18)
-deviceLabel.Position = UDim2.new(0,0,0,40)
-deviceLabel.BackgroundColor3 = Color3.fromRGB(30,30,50)
-deviceLabel.Text = isMobile and "📱 Mobile Mode - Joystick Fly" or "💻 PC Mode - WASD Fly"
-deviceLabel.TextColor3 = Color3.fromRGB(100,255,100)
-deviceLabel.TextScaled = true
-deviceLabel.Font = Enum.Font.Gotham
-deviceLabel.Parent = mainFrame
-
-local gameLabel = Instance.new("TextLabel")
-gameLabel.Size = UDim2.new(1,0,0,18)
-gameLabel.Position = UDim2.new(0,0,0,58)
-gameLabel.BackgroundColor3 = Color3.fromRGB(30,30,50)
-gameLabel.Text = isMM2 and "🎮 MM2 Mode Active" or "🎮 " .. game.Name
-gameLabel.TextColor3 = Color3.fromRGB(200,200,200)
-gameLabel.TextScaled = true
-gameLabel.Font = Enum.Font.Gotham
-gameLabel.Parent = mainFrame
-
 local content = Instance.new("ScrollingFrame")
-content.Size = UDim2.new(1,0,1,-80)
-content.Position = UDim2.new(0,0,0,80)
+content.Size = UDim2.new(1,0,1,-45)
+content.Position = UDim2.new(0,0,0,45)
 content.BackgroundTransparency = 1
 content.CanvasSize = UDim2.new(0,0,0,0)
-content.ScrollBarThickness = isMobile and 8 or 6
+content.ScrollBarThickness = 6
 content.Parent = mainFrame
 
 local layout = Instance.new("UIListLayout")
@@ -415,7 +461,7 @@ end)
 
 local function createButton(text, callback, color)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.94, 0, 0, isMobile and 55 or 45)
+    btn.Size = UDim2.new(0.94, 0, 0, 45)
     btn.BackgroundColor3 = color or Color3.fromRGB(45,45,65)
     btn.Text = text
     btn.TextColor3 = Color3.new(1,1,1)
@@ -424,25 +470,18 @@ local function createButton(text, callback, color)
     btn.Parent = content
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
     btn.MouseButton1Click:Connect(callback)
-    
-    -- Mobile touch support
-    if isMobile then
-        btn.TouchTap:Connect(callback)
-    end
     return btn
 end
 
--- Main Feature Buttons
+-- Create all buttons
 createButton("✈️ Toggle Fly", toggleFly, Color3.fromRGB(50,50,75))
 createButton("🚪 Toggle Noclip", toggleNoclip, Color3.fromRGB(50,50,75))
 createButton("👁️ Toggle ESP", toggleESP, Color3.fromRGB(50,50,75))
 createButton("👻 Toggle Invisible", toggleInvisible, Color3.fromRGB(50,50,75))
 createButton("🕺 Toggle Disco", toggleDisco, Color3.fromRGB(50,50,75))
-createButton("⚡ Toggle Speed 100", toggleSpeed, Color3.fromRGB(60,60,85))
-createButton("🦘 Toggle Jump 200", toggleJump, Color3.fromRGB(60,60,85))
+createButton("⚡ Toggle Speed", toggleSpeed, Color3.fromRGB(60,60,85))
+createButton("🦘 Toggle Jump", toggleJump, Color3.fromRGB(60,60,85))
 createButton("💀 Toggle Ragdoll", toggleRagdoll, Color3.fromRGB(80,40,40))
-
--- Loader Buttons
 createButton("📦 Load Infinite Yield", loadIY, Color3.fromRGB(80,50,50))
 createButton("📋 Load Pastefy", loadPastefy, Color3.fromRGB(80,50,70))
 createButton("🎭 Load Emotes", loadEmotes, Color3.fromRGB(80,50,80))
@@ -450,7 +489,7 @@ createButton("⚔️ Load Vertex MM2", loadVertex, Color3.fromRGB(80,50,60))
 
 -- Script Executor
 local execFrame = Instance.new("Frame")
-execFrame.Size = UDim2.new(0.94, 0, 0, isMobile and 130 or 110)
+execFrame.Size = UDim2.new(0.94, 0, 0, 110)
 execFrame.BackgroundColor3 = Color3.fromRGB(35,35,55)
 execFrame.Parent = content
 Instance.new("UICorner", execFrame).CornerRadius = UDim.new(0, 8)
@@ -465,7 +504,7 @@ execTitle.Font = Enum.Font.GothamBold
 execTitle.Parent = execFrame
 
 local scriptBox = Instance.new("TextBox")
-scriptBox.Size = UDim2.new(0.96, 0, 0, isMobile and 55 or 45)
+scriptBox.Size = UDim2.new(0.96, 0, 0, 45)
 scriptBox.Position = UDim2.new(0.02, 0, 0.3, 0)
 scriptBox.BackgroundColor3 = Color3.fromRGB(20,20,35)
 scriptBox.PlaceholderText = "Paste Lua script here..."
@@ -502,7 +541,7 @@ execBtn.MouseButton1Click:Connect(function()
     local code = scriptBox.Text
     if code and code ~= "" then
         local success, err = pcall(function() loadstring(code)() end)
-        notify(success and "✅ Script executed!" or "❌ Error")
+        notify(success and "✅ Executed!" or "❌ Error: " .. tostring(err))
     end
 end)
 
@@ -513,7 +552,7 @@ end)
 
 -- Credits
 local credFrame = Instance.new("Frame")
-credFrame.Size = UDim2.new(0.94, 0, 0, isMobile and 100 or 90)
+credFrame.Size = UDim2.new(0.94, 0, 0, 80)
 credFrame.BackgroundColor3 = Color3.fromRGB(30,30,50)
 credFrame.Parent = content
 Instance.new("UICorner", credFrame).CornerRadius = UDim.new(0, 8)
@@ -521,15 +560,15 @@ Instance.new("UICorner", credFrame).CornerRadius = UDim.new(0, 8)
 local credText = Instance.new("TextLabel")
 credText.Size = UDim2.new(1,0,1,0)
 credText.BackgroundTransparency = 1
-credText.Text = "👑 MAKERCS\nCreated by: ThatOneScripter1234\nVersion 3.0 | Mobile Friendly\nGitHub: ypw96hmxqy-cmd/MakerCS"
+credText.Text = "👑 MAKERCS\nCreated by: ThatOneScripter1234\nGitHub: ypw96hmxqy-cmd/MakerCS"
 credText.TextColor3 = Color3.fromRGB(200,200,200)
 credText.TextScaled = true
 credText.Font = Enum.Font.Gotham
 credText.Parent = credFrame
 
--- Floating minimize icon (mobile-friendly size)
+-- Floating minimize icon
 local icon = Instance.new("TextButton")
-icon.Size = UDim2.new(0, isMobile and 60 or 50, 0, isMobile and 60 or 50)
+icon.Size = UDim2.new(0, 50, 0, 50)
 icon.Position = UDim2.new(0.02, 0, 0.85, 0)
 icon.BackgroundColor3 = Color3.fromRGB(0,150,255)
 icon.Text = "⚙️"
@@ -538,7 +577,7 @@ icon.TextScaled = true
 icon.Visible = false
 icon.Draggable = true
 icon.Parent = gui
-Instance.new("UICorner", icon).CornerRadius = UDim.new(0, 30)
+Instance.new("UICorner", icon).CornerRadius = UDim.new(0, 25)
 
 minBtn.MouseButton1Click:Connect(function()
     mainFrame.Visible = false
@@ -550,23 +589,9 @@ icon.MouseButton1Click:Connect(function()
     icon.Visible = false
 end)
 
-if isMobile then
-    icon.TouchTap:Connect(function()
-        mainFrame.Visible = true
-        icon.Visible = false
-    end)
-end
+notify("✅ MakerCS Loaded!")
 
--- Final message
-notify("✅ MakerCS Loaded Successfully!")
-if isMobile then
-    notify("📱 Mobile Mode - Use joystick to fly! Jump = Up, Crouch = Down")
-end
 print("========================================")
-print("MakerCS - Mobile Friendly GitHub Version")
-print("Game: " .. game.Name)
-print("MM2 Mode: " .. tostring(isMM2))
-print("Device: " .. (isMobile and "Mobile (Joystick Fly)" or "PC (WASD Fly)"))
-print("Features: Fly, Noclip, ESP, Invisible, Disco, Speed, Jump, Ragdoll")
-print("Loaders: IY, Pastefy, Emotes, Vertex")
+print("MakerCS - Working Toggle Edition")
+print("All toggles should work properly now")
 print("========================================")
